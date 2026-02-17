@@ -1,8 +1,19 @@
+import sys
+import os
+
+# Aggiunge il percorso della cartella LIBERO al sistema
+path_to_libero = "/home/cyberm/Desktop/master-thesis/LIBERO"
+sys.path.insert(0, path_to_libero)
+
 from libero.libero import benchmark
 from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import os
 import imageio 
+
+# Ora get_libero_path dovrebbe restituire il percorso interno alla tua repository
+bddl_base_path = get_libero_path("bddl_files")
+print(f"I file BDDL verranno cercati in: {bddl_base_path}")
 
 # Configuration to use the render mode or to save video
 RENDER_MODE = True 
