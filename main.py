@@ -11,25 +11,29 @@ argparse = argparse.ArgumentParser(description="Args for video saving and render
 argparse.add_argument("--render", type=bool, default=True, help="True if you want to render the simulation")
 argparse.add_argument("--save_video", type=bool, default=True, help="True if you want to save video of the simulation")
 
+
 # Configuration to use the render mode or to save video
 RENDER_MODE = argparse.parse_args().render
 SAVE_VIDEO = argparse.parse_args().save_video
 RENDER_CAMERA = "agentview" # the camera name used for rendering and saving video, can be "agentview", "robot0_eye_in_hand", etc. depending on the task
+print(f"[info] RENDER_MODE: {RENDER_MODE}, SAVE_VIDEO: {SAVE_VIDEO}, RENDER_CAMERA: {RENDER_CAMERA}\n")
 
 
-benchmark_dict = benchmark.get_benchmark_dict()
+benchmark_dict = benchmark.get_benchmark_dict() # dictionary of the type {"<task_suite_name>": <task_suite>}
 task_suite_name = "libero_10" # can also choose libero_spatial, libero_object, etc.
-task_suite = benchmark_dict[task_suite_name]()
+task_suite = benchmark_dict[task_suite_name]() # task suite is a set of different tasks, we'll retrieve a specific task with the task_id
 
 # retrieve a specific task
-task_id = 0
-task = task_suite.get_task(task_id)
-task_name = task.name
-task_description = task.language
-task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
+task_id = 0 # id of the task to retrieve
+task = task_suite.get_task(task_id) # task is the object with all the information about the task
+task_name = task.name # the name of the task as "KITCHEN_SCENE_1_put_the_black_bowl_at_the_front_on_the_coffee_table"
+task_description = task.language # instruction in natural language ("Es. put the black bowl at the front on the coffee table")
 print(f"\n[info] retrieving task {task_id} from suite {task_suite_name}\n")
 print(f"[info] task description: {task_description}\n")
-      
+
+
+task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
+
 
 # step over the environment
 env_args = {
@@ -43,7 +47,6 @@ env_args = {
     "render_camera": RENDER_CAMERA, # the camera name used for rendering and saving video
 }
 
-print(f"[info] RENDER_MODE: {RENDER_MODE}, SAVE_VIDEO: {SAVE_VIDEO}, RENDER_CAMERA: {RENDER_CAMERA}\n")
 env = ControlEnv(**env_args)
 env.seed(0)
 env.reset()
@@ -52,7 +55,9 @@ init_state_id = 0
 env.set_init_state(init_states[init_state_id])
 
 dummy_action = [0.] * 7
-frames = [] 
+frames = [] # list used to store frames for video saving
+
+# Loop over the environment to apply actions and collect observations
 for step in range(1000):
     obs, reward, done, _ = env.step(dummy_action)
     if RENDER_MODE:
@@ -60,8 +65,10 @@ for step in range(1000):
     if SAVE_VIDEO:
         frames.append(obs["agentview_image"][::-1])
 
+# At the end the env is closed
 env.close()
 
+# Save video if required to a task.mp4 file
 if SAVE_VIDEO and len(frames) > 0:
     imageio.mimsave("task.mp4", frames, fps=60)
     print("Video saved: task.mp4")
