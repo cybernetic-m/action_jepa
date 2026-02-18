@@ -4,20 +4,18 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import os
 import imageio 
+import numpy as np
 
-# Argument parsing to configure rendering and video saving 
-# You can run the script with "python main.py --render --save_video " to render the simulation and to save a video at the end.
-# If you do not want to render the simulation or save a video, simply omit the flags.
+# Argument parsing to configure rendering
+# You can run the script with "python main.py --render" to render the simulation.
+# If you do not want to render the simulation simply omit the flag.
 argparse = argparse.ArgumentParser(description="Args for video saving and rendering")
 argparse.add_argument("--render", action="store_true", help="If you want to render the simulation write the flag --render")
-argparse.add_argument("--save_video", action="store_true", help="If you want to save video of the simulation write the flag --save_video")
 
-
-# Configuration to use the render mode or to save video
+# Configuration to use the render mode
 RENDER_MODE = argparse.parse_args().render
-SAVE_VIDEO = argparse.parse_args().save_video
-RENDER_CAMERA = "agentview" # the camera name used for rendering and saving video, can be "agentview", "robot0_eye_in_hand", etc. depending on the task
-print(f"[info] RENDER_MODE: {RENDER_MODE}, SAVE_VIDEO: {SAVE_VIDEO}, RENDER_CAMERA: {RENDER_CAMERA}\n")
+RENDER_CAMERA = "agentview" # the camera name used for rendering, can be "agentview", "robot0_eye_in_hand", etc. depending on the task
+print(f"[info] RENDER_MODE: {RENDER_MODE}, RENDER_CAMERA: {RENDER_CAMERA}\n")
 
 
 benchmark_dict = benchmark.get_benchmark_dict() # dictionary of the type {"<task_suite_name>": <task_suite_class>} (Ex. "libero_spatial": <class 'libero.libero.benchmark.LIBERO_SPATIAL'>)
@@ -46,10 +44,10 @@ env_args = {
     "bddl_file_name": task_bddl_file, # path of the BDDL file
     "camera_heights": 1024, 
     "camera_widths": 1024,
-    #"camera_names": ["agentview"],
+    "camera_names": ["agentview"],
     "has_renderer": RENDER_MODE, # If True, open the MuJoCo screen to render the env
-    "has_offscreen_renderer": SAVE_VIDEO, # If True, save images rendered to create a video 
-    "use_camera_obs": SAVE_VIDEO, # If True, the "obs" will include camera observations (e.g., RGB images) that can be used to create a video. 
+    "has_offscreen_renderer": True, # If True, save images rendered to create a video 
+    "use_camera_obs": True, # If True, the "obs" will include camera observations (e.g., RGB images) that can be used to create a video. 
     "render_camera": RENDER_CAMERA, # the camera name used for rendering and saving video
 }
 
@@ -67,17 +65,31 @@ dummy_action = [0.] * 7
 frames = [] # list used to store frames for video saving
 
 # Loop over the environment to apply actions and collect observations
+# Obs is an ordered dict that have information about the ROBOT:
+# - "agentview_image": the RGB image from the agent's camera => camera_heights x camera_widths x 3 (ex 1024 x 1024 x 3)
+# - "robot0_joint_positions": array of vlues of the robot's joint positions 
+# - "robot0_joint_pos_cos (or sin)": array of cos (or sin) values of the robot's joint positions
+# - "robot0_joint_vel": array of values of the robot's joint velocities
+# - "robot0_eef_pos": array of values of the robot's end effector position (x,y,z)
+# - "robot0_eef_quat": array of values of the robot's end effector orientation in quaternion (x,y,z,w)
+# - "robot0_gripper_qpos": the gripper's position (two values for the two fingers distances from the center, 0 means fully closed)
+# - "robot0_gripper_qvel": the gripper's velocity (two values for the two fingers velocities)
+# And information about the object. Each object called "objectName" has two arrays:
+# - "objectName_pos": array of values of the object's position (x,y,z)
+# - "objectName_quat": array of values of the object's orientation in quaternion (x,y,z,w)
+# - "objectName_to_robot0_eef_pos": array of values of the object's position relative to the robot's end effector (x,y,z)
+# - "objectName_to_robot0_eef_quat": array of values of the object's orientation relative to the robot's end effector (x,y,z,w)
+
 for step in range(100):
     obs, reward, done, _ = env.step(dummy_action)
     if RENDER_MODE:
         env.env.viewer.render()
-    if SAVE_VIDEO:
-        frames.append(obs["agentview_image"][::-1])
+    frames.append(np.flipud(obs["agentview_image"])) # np.flipud means Flip Up Down, it is used to flip the image vertically before appending
 
 # At the end the env is closed
 env.close()
 
 # Save video if required to a task.mp4 file
-if SAVE_VIDEO and len(frames) > 0:
+if len(frames) > 0:
     imageio.mimsave("task.mp4", frames, fps=60)
     print("Video saved: task.mp4")
