@@ -5,11 +5,15 @@ from libero.libero.utils import get_libero_path
 import os
 import imageio 
 
+# Argument parsing to configure rendering and video saving 
+# You can run the script with "python main.py --render {True,False} --save_video {True,False}" to render/not render the simulation and to save/not save a video at the end
 argparse = argparse.ArgumentParser(description="Args for video saving and rendering")
-argparse.addargument("--render", type=bool, default=True, help="Whether to render the")
+argparse.add_argument("--render", type=bool, default=True, help="True if you want to render the simulation")
+argparse.add_argument("--save_video", type=bool, default=True, help="True if you want to save video of the simulation")
+
 # Configuration to use the render mode or to save video
-RENDER_MODE = True 
-SAVE_VIDEO = True 
+RENDER_MODE = argparse.parse_args().render
+SAVE_VIDEO = argparse.parse_args().save_video
 RENDER_CAMERA = "agentview" # the camera name used for rendering and saving video, can be "agentview", "robot0_eye_in_hand", etc. depending on the task
 
 
@@ -50,7 +54,7 @@ env.set_init_state(init_states[init_state_id])
 dummy_action = [0.] * 7
 frames = [] 
 for step in range(1000):
-    obs, reward, done, info = env.step(dummy_action)
+    obs, reward, done, _ = env.step(dummy_action)
     if RENDER_MODE:
         env.env.viewer.render()
     if SAVE_VIDEO:
