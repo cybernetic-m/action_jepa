@@ -1,10 +1,35 @@
-import argparse 
+import argparse
+from email.mime import image 
 from libero.libero import benchmark
 from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import os
 import imageio 
 import numpy as np
+
+
+#----------- OpenVLA Definition ---------------#
+# Install minimal dependencies (`torch`, `transformers`, `timm`, `tokenizers`, ...)
+# > pip install -r https://raw.githubusercontent.com/openvla/openvla/main/requirements-min.txt
+from transformers import AutoModelForVision2Seq, AutoProcessor
+from PIL import Image
+
+import torch
+
+
+# ---- Check if CUDA is available and set the device accordingly -------#
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+# Load Processor & VLA
+processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
+vla = AutoModelForVision2Seq.from_pretrained(
+    "openvla/openvla-7b",
+    attn_implementation="sdpa",  # [Optional] Requires `flash_attn`
+    torch_dtype=torch.bfloat16, 
+    low_cpu_mem_usage=True, 
+    trust_remote_code=True
+).to(device)
+
 
 # Argument parsing to configure rendering
 # You can run the script with "python main.py --render" to render the simulation.
@@ -38,6 +63,8 @@ print(f"[info] task description: {task_description}\n")
 task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
 print(f"[info] BDDL file for the task: {task_bddl_file}\n")
 
+# Define the text instruction for the VLA
+text_instruction = f"In: What action should the robot take to {task_description}?\nOut:"
 
 # Args for environment initialization
 env_args = {
@@ -61,7 +88,7 @@ init_states = task_suite.get_task_init_states(task_id) # for benchmarking purpos
 init_state_id = 10 # Among all 50 initial states you can spawn objects in different ways choosing init_state_id (it can be a int number in [0,49])
 env.set_init_state(init_states[init_state_id]) # set the init_state chosen
 
-dummy_action = [0.] * 7
+init_action = [0.] * 7 # a start action needed for the first step, to have the first observation from the environment
 frames = [] # list used to store frames for video saving
 
 # Loop over the environment to apply actions and collect observations
@@ -80,8 +107,18 @@ frames = [] # list used to store frames for video saving
 # - "objectName_to_robot0_eef_pos": array of values of the object's position relative to the robot's end effector (x,y,z)
 # - "objectName_to_robot0_eef_quat": array of values of the object's orientation relative to the robot's end effector (x,y,z,w)
 
+obs, _, _, _ = env.step(init_action) # apply the first zero action to have the first observation from the environment
+
 for step in range(100):
-    obs, reward, done, _ = env.step(dummy_action)
+    print(f"\nStep {step}\n")
+    image = obs["agentview_image"] # get the RGB image from the agent's camera
+    image_pil = Image.fromarray(image.astype('uint8')) # convert the image to PIL format for the processor
+
+    inputs = processor(text_instruction, image_pil).to(device, dtype=torch.bfloat16)
+    action = vla.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+    print(f"Action predicted by the VLA: {action}\n")
+
+    obs, reward, done, _ = env.step(action)
     if RENDER_MODE:
         env.env.viewer.render()
     frames.append(np.flipud(obs["agentview_image"])) # np.flipud means Flip Up Down, it is used to flip the image vertically before appending
