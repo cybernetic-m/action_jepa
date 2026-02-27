@@ -35,13 +35,14 @@ import torch
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # Load Processor & VLA
-processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
+processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True, local_files_only=True)
 vla = AutoModelForVision2Seq.from_pretrained(
     "openvla/openvla-7b",
     torch_dtype=torch.float16,    
     low_cpu_mem_usage=True, 
     trust_remote_code=True,
-    device_map="auto"             
+    device_map="auto" ,
+    local_files_only=True            
 )
 
 
