@@ -24,11 +24,11 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
 vla = AutoModelForVision2Seq.from_pretrained(
     "openvla/openvla-7b",
-    attn_implementation="sdpa",  # [Optional] Requires `flash_attn`
-    torch_dtype=torch.bfloat16, 
+    torch_dtype=torch.float16,    
     low_cpu_mem_usage=True, 
-    trust_remote_code=True
-).to(device)
+    trust_remote_code=True,
+    device_map="auto"             
+)
 
 
 # Argument parsing to configure rendering
