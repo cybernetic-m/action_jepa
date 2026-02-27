@@ -3,9 +3,22 @@ from email.mime import image
 from libero.libero import benchmark
 from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
-import os
 import imageio 
 import numpy as np
+
+import sys
+import os
+
+# Ottiene il percorso della cartella dove si trova questo script (main.py)
+# cioè /home/mromano/master-thesis/
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Costruisce il percorso verso LIBERO in modo dinamico
+libero_path = os.path.join(current_dir, "LIBERO")
+
+# Aggiunge il percorso al sistema se non è già presente
+if libero_path not in sys.path:
+    sys.path.insert(0, libero_path)
 
 
 #----------- OpenVLA Definition ---------------#
