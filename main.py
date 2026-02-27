@@ -82,8 +82,8 @@ text_instruction = f"In: What action should the robot take to {task_description}
 # Args for environment initialization
 env_args = {
     "bddl_file_name": task_bddl_file, # path of the BDDL file
-    "camera_heights": 1024, 
-    "camera_widths": 1024,
+    "camera_heights": 256, 
+    "camera_widths": 256,
     "camera_names": ["agentview"],
     "has_renderer": RENDER_MODE, # If True, open the MuJoCo screen to render the env
     "has_offscreen_renderer": True, # If True, save images rendered to create a video 
