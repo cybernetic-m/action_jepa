@@ -1,49 +1,20 @@
 import sys
 import os
-
-# Ottiene il percorso della cartella dove si trova questo script (main.py)
-# cioè /home/mromano/master-thesis/
+# Define the current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Costruisce il percorso verso LIBERO in modo dinamico
+# Define the path to the LIBERO directory (assuming it is in the same directory as this main file)
 libero_path = os.path.join(current_dir, "LIBERO")
-
-# Aggiunge il percorso al sistema se non è già presente
+# Add the LIBERO directory to the system path if it's not already there, so that we can import LIBERO modules
 if libero_path not in sys.path:
     sys.path.insert(0, libero_path)
 
 
 import argparse
-from email.mime import image 
 from libero.libero import benchmark
 from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import imageio 
 import numpy as np
-
-
-#----------- OpenVLA Definition ---------------#
-# Install minimal dependencies (`torch`, `transformers`, `timm`, `tokenizers`, ...)
-# > pip install -r https://raw.githubusercontent.com/openvla/openvla/main/requirements-min.txt
-from transformers import AutoModelForVision2Seq, AutoProcessor
-from PIL import Image
-
-import torch
-
-
-# ---- Check if CUDA is available and set the device accordingly -------#
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-# Load Processor & VLA
-processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True, local_files_only=True)
-vla = AutoModelForVision2Seq.from_pretrained(
-    "openvla/openvla-7b",
-    torch_dtype=torch.float16,    
-    low_cpu_mem_usage=True, 
-    trust_remote_code=True,
-    device_map="auto" ,
-    local_files_only=True            
-)
 
 
 # Argument parsing to configure rendering
@@ -127,10 +98,9 @@ obs, _, _, _ = env.step(init_action) # apply the first zero action to have the f
 for step in range(100):
     print(f"\nStep {step}\n")
     image = obs["agentview_image"] # get the RGB image from the agent's camera
-    image_pil = Image.fromarray(image.astype('uint8')) # convert the image to PIL format for the processor
 
-    inputs = processor(text_instruction, image_pil).to(device, dtype=torch.bfloat16)
-    action = vla.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
+    # At the moment a zero action 
+    action = [0.0] * 7
     print(f"Action predicted by the VLA: {action}\n")
 
     obs, reward, done, _ = env.step(action)
