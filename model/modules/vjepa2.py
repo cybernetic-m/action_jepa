@@ -1,5 +1,13 @@
-# Code for V JEPa 2 AC module implementation
+from transformers import AutoVideoProcessor, AutoModel
 
-import torch
+hf_repo = "facebook/vjepa2-vitg-fpc64-256"
+# facebook/vjepa2-vitl-fpc64-256
+# facebook/vjepa2-vith-fpc64-256
+# facebook/vjepa2-vitg-fpc64-256
+# facebook/vjepa2-vitg-fpc64-384
 
-model, preprocessor = torch.hub.load('facebookresearch/jepa-wms', 'vjepa2_ac_droid')
+
+model = AutoModel.from_pretrained(hf_repo)
+processor = AutoVideoProcessor.from_pretrained(hf_repo)
+
+print(model)
