@@ -11,8 +11,9 @@ def hf_download_models(hf_repo_id_list):
 # Description: Function to download the weights of different models 
 # and save them to the local directory "checkpoints".
 # Args:
-#   model_list (list of str): A list of model names to be downloaded.
-#   model_urls (list of str): A list of URLs corresponding to the models in model_list
+#   hf_repo_id_list: A list of Hugging Face repository identifiers to download the models from, for example ["facebook/vjepa2-vith-fpc64-256", "google-bert/bert-base-uncased"]
+# Returns:
+#   target_dir: The local directory where the downloaded models are saved, in this case "checkpoints"
 
     target_dir = "checkpoints" # the directory where the downloaded models will be saved 
 
