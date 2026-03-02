@@ -208,4 +208,7 @@ __marimo__/
 
 *.mp4
 
+# To not push conda virtual environments to git
 myenv
+# To not push model checkpoints to git
+checkpoints 
