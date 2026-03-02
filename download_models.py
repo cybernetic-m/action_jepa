@@ -6,6 +6,8 @@
 import os
 import requests
 from tqdm import tqdm
+from transformers import AutoVideoProcessor, AutoModel
+from huggingface_hub import snapshot_download
 
 # --- DOWNLOAD FUNCTION ---- #
 def download_file(url, output_path):
@@ -42,36 +44,49 @@ def download_file(url, output_path):
         print(f"A generic error occurred while downloading the file: {err}")
 
 
-# --- GET WEIGHTS FUNCTION ---- #
-def get_weights():
-# Description: Function to download the weights of the V-JEPA 2 AC model from Zenodo at the link "https://zenodo.org/records/18834364"
+# --- DOWNLOAD MODELS FUNCTION ---- #
+def hf_download_models(hf_repo_id_list):
+# Description: Function to download the weights of different models 
 # and save them to the local directory "checkpoints".
+# Args:
+#   model_list (list of str): A list of model names to be downloaded.
+#   model_urls (list of str): A list of URLs corresponding to the models in model_list
 
-    # The filename of the model to be downloaded and the target directory where the file will be saved
-    filename = "vjepa2_ac_droid.pth.tar"
-    target_dir = "checkpoints"
-    local_path = os.path.join(target_dir, filename) # the full local path where the file will be saved (Ex. checkpoints/vjepa2_ac_droid.pth.tar)
+    target_dir = "checkpoints" # the directory where the downloaded models will be saved 
 
-    # Create the target directory if it does not exist, otherwise print that the directory already exists
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-        print(f"Created directory: {target_dir}")
-    else: 
-        print(f"Directory already exists: {target_dir}")
-    
-    # Check if the file already exists at the local path. 
-    if os.path.exists(local_path):
-        print(f"File already exists at: {local_path}")
-        return local_path
-    
-    # The Zenodo URL for the file to be downloaded
-    url = f"https://zenodo.org/records/18834364/files/{filename}?download=1" # direct download link for the file on Zenodo
+    for repo_id in hf_repo_id_list:
+        print(f"Downloading model from Hugging Face repository: {repo_id}")
+        
+        local_dir = os.path.join(target_dir, repo_id) # the full local path where the file will be saved (Ex. checkpoints/vjepa2_ac_droid.pth.tar)
 
-    # Call the download function to download the file from the specified URL and save it to the local path
-    download_file(url, local_path)
-    return local_path
+        # Create the target directory if it does not exist, otherwise print that the directory already exists
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir)
+            print(f"Created directory: {target_dir}")
+        else: 
+            print(f"Directory already exists: {target_dir}")
+            continue
+        
+        # Check if the file already exists at the local path. 
+        if os.path.exists(local_dir):
+            print(f"File already exists at: {local_dir}")
+            continue
+
+        # Call the download function of Hugging Face to download the file from the specified URL and save it to the local path
+        snapshot_download(
+            repo_id=repo_id, # the identifier of the Hugging Face repository to download from, for example "facebook/vjepa2-vitg-fpc64-256"
+            local_dir=local_dir, # the local directory where the downloaded files will be saved, in this case "checkpoints"
+            local_dir_use_symlinks=False, # if True, the downloaded files will be saved as symbolic links to the cache directory, if False the files will be copied to the local directory.
+            revision="main", # the branch, tag or git identifier to download from the repository, in this case we want to download from the main branch
+        )
+    return target_dir
+
 
 if __name__ == "__main__":
     # Call the function to download the V-JEPA 2 weights and save them to the local directory "checkpoints"
-    weights_path = get_weights()
+    weights_path = hf_download_models(
+                    hf_repo_id_list=[
+                        "facebook/vjepa2-vith-fpc64-256",
+                        "google-bert/bert-base-uncased"
+                    )
     print(f"Pretrained model weights downloaded and saved at: {weights_path}")
