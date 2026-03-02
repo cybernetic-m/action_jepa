@@ -1,3 +1,8 @@
+# Author: Massimo Romano
+# Master Thesis - Sapienza University of Rome
+# Title: ""
+# Data: 2026
+
 import sys
 import os
 # Define the current directory
