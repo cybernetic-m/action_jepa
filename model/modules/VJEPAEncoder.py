@@ -1,43 +1,47 @@
 import torch
+import os
 import numpy as np
 import torch.nn as nn
 from transformers import AutoVideoProcessor, AutoModel
 
 
 class VJEPAEncoder(nn.Module):
-    def __init__(self, model_path):
+    def __init__(self, model_path="checkpoints/facebook/vjepa2-vith-fpc64-256", device="cpu"):
         super(VJEPAEncoder, self).__init__()
 
+        # Setting the device (ex. cuda or cpu)
+        self.device = device
+        
         # load the model weights from the local path, setting local_files_only to True to avoid trying to download the weights from Hugging Face if they are not found at the local path
-        self.model = AutoModel.from_pretrained(model_path, local_files_only=True) 
-        # Load the encoder from the model
-        self.encoder = self.model.encoder
-        # Load the processor
-        self.processor = AutoVideoProcessor.from_pretrained(model_path, local_files_only=True)
+        if os.path.exists(model_path):
+            self.model = AutoModel.from_pretrained(model_path, local_files_only=True).to(device) # load the entire V-JEPA Model
+            self.vision_encoder = self.model.encoder # Take only the V-JEPA Encoder part
+            self.vision_processor = AutoVideoProcessor.from_pretrained(model_path, local_files_only=True) # Load the processor
+        else:
+            raise FileNotFoundError(f"V-JEPA model not found in {model_path}. Run 'python download_models.py' to download it!")
+        
+        # Freeze the V-JEPA 2 image encoder parameters 
+        for param in self.vision_encoder.parameters():
+            param.requires_grad = False
+        self.vision_encoder.eval() # Put the encoder in evaluation mode
     
-    def get_model_info(self):
-        return {
-            "encoder": self.encoder,
-            "processor": self.processor
-        }
-
-
     def preprocess_frames(self, frames):
         # Preprocess the input frames using the processor
-        inputs = self.processor(videos=frames, return_tensors="pt")
-        return inputs
+        inputs = self.vision_processor(videos=frames, return_tensors="pt").to(self.device)
+        return inputs['pixel_values_videos']
 
-    def forward(self, inputs):
-        outputs = self.encoder(inputs)
-        return outputs
+    def forward(self, pixel_values):
+        with torch.no_grad():
+            outputs = self.vision_encoder(pixel_values)
+        return outputs.last_hidden_state
     
 
 if __name__ == "__main__":
     # Example usage of the VJEPABackbone class
     model_path = "checkpoints/facebook/vjepa2-vith-fpc64-256" # the local path where the model weights are saved, for example "checkpoints/facebook/vjepa2-vith-fpc64-256"
-    vjepa_encoder = VJEPAEncoder(model_path)
+    vjepa_encoder = VJEPAEncoder(device='cuda')
     frames = [np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8) for _ in range(16)]
     inputs = vjepa_encoder.preprocess_frames(frames)
-    outputs = vjepa_encoder(inputs['pixel_values_videos'])
-    print(type(outputs))
+    outputs = vjepa_encoder(inputs)
+    print(outputs.shape)
     
