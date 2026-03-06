@@ -6,7 +6,7 @@ from transformers import AutoVideoProcessor, AutoModel
 
 
 class VJEPABackbone(nn.Module):
-    def __init__(self, model_path, encoder_only = True, device="cpu"):
+    def __init__(self, model_path, device="cpu"):
         super(VJEPABackbone, self).__init__()
 
         # Setting the device (ex. cuda or cpu)
@@ -17,19 +17,12 @@ class VJEPABackbone(nn.Module):
             self.model = AutoModel.from_pretrained(model_path, local_files_only=True).to(device) # load the entire V-JEPA Model
             self.vision_encoder = self.model.encoder # Take only the V-JEPA Encoder part
             self.vision_processor = AutoVideoProcessor.from_pretrained(model_path, local_files_only=True) # Load the processor
-            # Load also the V-JEPA 2 predictor if needed ("basic" World Model mode)
-            if not encoder_only:
-                self.vision_predictor = self.model.predictor
         else:
             raise FileNotFoundError(f"V-JEPA model not found in {model_path}. Run 'python download_models.py' to download it!")
         
         # Freeze the V-JEPA 2 image encoder parameters 
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
-
-            if not encoder_only:
-                for param in self.vision_predictor.parameters():
-                    param.requires_grad = False
         self.vision_encoder.eval() # Put the encoder in evaluation mode
     
     def preprocess_frames(self, frames):
@@ -45,7 +38,6 @@ class VJEPABackbone(nn.Module):
 
 if __name__ == "__main__":
     # Example usage of the VJEPABackbone class
-    model_path_fullModel = "checkpoints/facebook/jepa-wms/vjepa2_ac_droid.pth.tar"
     model_path_encoderOnly = "checkpoints/facebook/vjepa2-vith-fpc64-256" 
     vjepa_encoder = VJEPABackbone(device='cuda')
     frames = [np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8) for _ in range(16)]
