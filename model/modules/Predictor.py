@@ -51,8 +51,8 @@ class Predictor(nn.Module):
         
         # Projecting inputs to the prediction_dim feature space
         goal_feat = self.language_proj(z_goal)
-        state_feat = self.state_proj(state)
-        action_feat = self.action_proj(action)
+        state_feat = self.state_proj(state).unsqueeze(1) # state is a tensor [Batch_size,7], we need unsqueeze to add a dimension [Batch_size,1,7]
+        action_feat = self.action_proj(action).unsqueeze(1) # action is a tensor [Batch_size,7], we need unsqueeze to add a dimension [Batch_size,1,7]
         vision_feat = self.vision_proj(z_obs)
 
         # Concatenate to create the x token sequence
@@ -66,7 +66,7 @@ class Predictor(nn.Module):
 
         # Returning to the dimension of vision_dim (V-JEPA dimension for self-supervision loss)
         # Returning only the prediction of the vision tokens, to compare to the ground truth vision tokens from the video
-        z_next_pred = self.out_proj(x[:, -num_vision_tokens, :])
+        z_next_pred = self.out_proj(x[:, -num_vision_tokens:, :])
 
         return z_next_pred
 
@@ -82,6 +82,7 @@ if __name__ == "__main__":
     action = torch.randn(1, 7).to(device)
 
     z_next_pred = predictor(z_goal, state, action, z_obs)
+    print(z_next_pred.shape)
         
         
 
