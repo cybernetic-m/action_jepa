@@ -4,9 +4,9 @@ import numpy as np
 import torch.nn as nn
 from transformers import CLIPTokenizer, CLIPTextModel
 
-class CLIPEncoder(nn.Module):
-    def __init__(self, model_path="checkpoints/openai/clip-vit-large-patch14", embedding_dim = 1280 ,device="cpu"):
-        super(CLIPEncoder, self).__init__()
+class CLIPBackbone(nn.Module):
+    def __init__(self, model_path, embedding_dim = 1280 ,device="cpu"):
+        super(CLIPBackbone, self).__init__()
         
         # Setting the device (ex. cuda or cpu)
         self.device = device
@@ -41,7 +41,8 @@ class CLIPEncoder(nn.Module):
 
 
 if __name__ == "__main__":
-    clipencoder = CLIPEncoder(device="cuda")
+    model_path = "checkpoints/openai/clip-vit-large-patch14"
+    clipencoder = CLIPBackbone(model_path=model_path, device="cuda")
     text = "Pick up the red cube and place it to the right of the blue cube."
     outputs = clipencoder(text)
     print(outputs.shape)

@@ -50,7 +50,8 @@ if __name__ == "__main__":
     weights_path = hf_download_models(
                     hf_repo_id_list=[
                         "facebook/vjepa2-vith-fpc64-256",
-                        "openai/clip-vit-large-patch14"
+                        "openai/clip-vit-large-patch14",
+                        "facebook/jepa-wms/vjepa2_ac_droid.pth.tar"
                     ]
                     )
     print(f"\nPretrained model weights downloaded and saved at: {weights_path}\n")
