@@ -38,8 +38,8 @@ class VJEPABackbone(nn.Module):
 
 if __name__ == "__main__":
     # Example usage of the VJEPABackbone class
-    model_path_encoderOnly = "checkpoints/facebook/vjepa2-vith-fpc64-256" 
-    vjepa_encoder = VJEPABackbone(device='cuda')
+    model_path= "checkpoints/facebook/vjepa2-vith-fpc64-256" 
+    vjepa_encoder = VJEPABackbone(model_path=model_path, device='cuda')
     frames = [np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8) for _ in range(16)]
     inputs = vjepa_encoder.preprocess_frames(frames)
     outputs = vjepa_encoder(inputs)
