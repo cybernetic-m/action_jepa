@@ -24,7 +24,7 @@ class CLIPBackbone(nn.Module):
             param.requires_grad = False
 
     def tokenization(self, text):
-        text_tokens = self.tokenizer(text, padding=True, truncation=True, max_length = 77, return_tensors="pt").to(self.device)
+        text_tokens = self.tokenizer(text, padding='max_length', truncation=True, max_length = 77, return_tensors="pt").to(self.device)
         return text_tokens
         
     def forward(self, text_tokens):

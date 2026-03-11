@@ -55,6 +55,7 @@ class SemanticJEPA(nn.Module):
         else:
             pixel_video_values = self.vision_backbone.preprocess_frames(vision_input)
             z_obs = self.vision_backbone(pixel_video_values)
+            print(z_obs.shape)
 
         # Secondly we use CLIP to produce embeddings of the text_instruction (same reasoning fro training and inference of before)
         # Training
@@ -64,6 +65,7 @@ class SemanticJEPA(nn.Module):
         else:
             text_tokens = self.language_backbone.tokenization(text_input)
             z_goal = self.language_backbone(text_tokens)
+            print(z_goal.shape)
 
         return self.predictor(z_goal, state, action, z_obs)
     
@@ -90,8 +92,7 @@ if __name__== "__main__":
     z_next_pred_train = semantic_jepa(z_obs_train, z_goal_train, state, action)
 
     # TEST OF THE INFERENCE PHASE
-    
-    raw_frames = [np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8) for _ in range(16)]
+    raw_frames = [np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8) for _ in range(16)]
     raw_text = "Pick up the red cube and place it to the right."
 
     z_next_pred_inf = semantic_jepa(raw_frames, raw_text, state, action)
