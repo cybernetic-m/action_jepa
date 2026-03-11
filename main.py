@@ -60,6 +60,7 @@ text_instruction = f"In: What action should the robot take to {task_description}
 # Args for environment initialization
 env_args = {
     "bddl_file_name": task_bddl_file, # path of the BDDL file
+    "robots": ["Sawyer"],
     "camera_heights": 256, 
     "camera_widths": 256,
     "camera_names": ["agentview"],
