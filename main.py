@@ -18,6 +18,7 @@ import argparse
 from libero.libero import benchmark
 from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
+import numpy as np
 import imageio 
 
 
