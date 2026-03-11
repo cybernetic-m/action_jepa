@@ -25,10 +25,10 @@ class VJEPABackbone(nn.Module):
             param.requires_grad = False
         self.vision_encoder.eval() # Put the encoder in evaluation mode
     
-    def preprocess_frames(self, frames):
+    def preprocess_frames(self, video_frames):
         # Preprocess the input frames using the processor
-        inputs = self.vision_processor(videos=frames, return_tensors="pt").to(self.device)
-        return inputs['pixel_values_videos']
+        vision_patches = self.vision_processor(videos=video_frames, return_tensors="pt").to(self.device)
+        return vision_patches['pixel_values_videos']
 
     def forward(self, pixel_values):
         with torch.no_grad():

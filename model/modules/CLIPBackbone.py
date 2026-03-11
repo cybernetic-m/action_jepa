@@ -22,14 +22,15 @@ class CLIPBackbone(nn.Module):
         # Freeze the CLIP text encoder parameters 
         for param in self.language_encoder.parameters():
             param.requires_grad = False
-        
-    def forward(self, text):
+
+    def tokenization(self, text):
         text_tokens = self.tokenizer(text, padding=True, truncation=True, max_length = 77, return_tensors="pt").to(self.device)
+        return text_tokens
+        
+    def forward(self, text_tokens):
         with torch.no_grad():
             outputs = self.language_encoder(**text_tokens)
             last_hidden_state = outputs.last_hidden_state
-        
-
         return last_hidden_state
 
 
@@ -39,5 +40,6 @@ if __name__ == "__main__":
     model_path = "checkpoints/openai/clip-vit-large-patch14"
     clipencoder = CLIPBackbone(model_path=model_path, device="cuda")
     text = "Pick up the red cube and place it to the right of the blue cube."
-    outputs = clipencoder(text)
+    text_tokens = clipencoder.tokenization(text)
+    outputs = clipencoder(text_tokens)
     print(outputs.shape)
