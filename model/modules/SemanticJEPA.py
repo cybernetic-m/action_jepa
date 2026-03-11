@@ -3,7 +3,9 @@ import torch.nn as nn
 import os
 import numpy as np
 
-from modules import CLIPBackbone, VJEPABackbone, Predictor
+from CLIPBackbone import CLIPBackbone
+from VJEPABackbone import VJEPABackbone
+from Predictor import Predictor
 
 class SemanticJEPA(nn.Module):
     def __init__(self, 
