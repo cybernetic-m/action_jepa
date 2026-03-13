@@ -22,9 +22,20 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
   if num_steps < window_steps:
     return None, None, None, None
   
-  # Otherwise we'll take the last 4s part of the episode, taking num_frames frames!
-  start_idx = num_steps - window_steps
-  end_idx = num_steps-1
+  # Otherwise we'll take the 4s videos in the middle part of the episode to try to catch the most "semantic" important motion
+  # Compute the middle part of the episode (Ex. ep of 300 steps => ep_mid_idx = 150)
+  ep_mid_idx = num_steps // 2
+  # The window is centered at ep_mid_idx, it means we take the half of the window size (window_steps//2) and subtract this to the mid idx
+  start_idx = ep_mid_idx - (window_steps//2)
+  start_idx = max(0,start_idx) # if start_idx is negative, then take the first frame
+  # The end_idx is simply start plus the window_steps size
+  end_idx = start_idx + window_steps
+
+  # Check if the end index go outside the total number of steps
+  if end_idx > num_steps:
+    end_idx = num_steps - 1 # take the last frame
+    start_idx = max(0, end_idx - window_steps) # the start is 0 if end_idx - window_steps is negative
+
   indices = np.linspace(start_idx, end_idx, num_frames).astype(int)
 
   for idx in indices:
