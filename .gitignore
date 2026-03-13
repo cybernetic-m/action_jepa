@@ -212,3 +212,5 @@ __marimo__/
 myenv
 # To not push model checkpoints to git
 checkpoints 
+# To not push data
+data
