@@ -2,7 +2,28 @@ import numpy as np
 import torch
 import cv2
 
-def process_data(episode, num_frames, fps, window_second_size, lang_keys):
+def find_language_instr(steps, lang_keys, dataset):
+  
+  found_instrunction = False
+  language_instructions = []
+
+  for key in lang_keys:
+    instr = ""
+    for step in steps:
+      if dataset == "droid":
+        string = step[key].numpy().decode('utf-8').strip()
+      elif dataset == "bridge":
+        string = step['observation'][key].numpy().decode('utf-8').strip()
+      if string:
+        instr = string
+        found_instrunction = True
+        break
+        
+    language_instructions.append(instr)
+
+  return language_instructions, found_instrunction
+
+def process_data(episode, num_frames, fps, window_second_size, lang_keys, dataset):
   # Function that having
 
   # Take the entire episode steps and load the single episode in RAM
@@ -12,17 +33,26 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
   video_frames = []
   states = []
 
-  # Take all language instructions and create a list with all the texts
-  language_instructions = [steps[0][key].numpy().decode('utf-8') for key in lang_keys]
-
+  '''
+  if dataset == 'droid':
+    # Take all language instructions and create a list with all the texts
+    language_instructions = [steps[0][key].numpy().decode('utf-8') for key in lang_keys]
+    print(language_instructions)
+  elif dataset == 'bridge':
+    language_instructions = [steps[0]['observation'][key].numpy().decode('utf-8') for key in lang_keys]
+'''
+  language_instructions, found_instrunction = find_language_instr(steps=steps, 
+                                                                  lang_keys=lang_keys, 
+                                                                  dataset=dataset)
+  
   num_steps = len(steps) # num of total steps of the episode (we have 1 frame RGB per step)
   window_steps = window_second_size * fps # compute how much steps in our window we take
 
-  # If the video is less then 4s we skip the video returning None 
+  # If the video is less then tot seconds we skip the video returning None 
   if num_steps < window_steps:
-    return None, None, None, None
+    return None, None, None, None, None, None
   
-  # Otherwise we'll take the 4s videos in the middle part of the episode to try to catch the most "semantic" important motion
+  # Otherwise we'll take the tot seconds videos in the middle part of the episode to try to catch the most "semantic" important motion
   # Compute the middle part of the episode (Ex. ep of 300 steps => ep_mid_idx = 150)
   ep_mid_idx = num_steps // 2
   # The window is centered at ep_mid_idx, it means we take the half of the window size (window_steps//2) and subtract this to the mid idx
@@ -37,6 +67,8 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
     start_idx = max(0, end_idx - window_steps) # the start is 0 if end_idx - window_steps is negative
 
   indices = np.linspace(start_idx, end_idx, num_frames).astype(int)
+  
+  video_extracted_seconds = (indices[-1] - indices[0])/fps
 
   for idx in indices:
     # Extract the image at idx, transform to numpy, resize to 256x256 with opencv library and append to video_frames list
@@ -48,9 +80,12 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
     #   [[R, G, B], [R, G, B], ...]   <- Row 256
     # ]
     # Inner values (0-255) define the intensity for Red, Green, and Blue respectively.  
-    img = steps[idx]['observation']['exterior_image_1_left'].numpy()
+    if dataset == 'droid':
+      img = steps[idx]['observation']['exterior_image_1_left'].numpy()
+    elif dataset == 'bridge':
+      img = steps[idx]['observation']['image'].numpy()
+
     img = cv2.resize(img, (256,256), interpolation=cv2.INTER_AREA)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # used to save the color sequence correctly
     video_frames.append(img) 
 
     # Extract the state (end effector pos+orientation+gripper => 7D state dim) at idx
@@ -61,9 +96,13 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
     #   Gripper         <- 1D Gripper state (Open/Close value)
     # ]
     # It is formed by concatenating the 6D 'cartesian_position' and the 1D 'gripper_position'.
-    state_pr = steps[idx]['observation']['cartesian_position'].numpy() # 6D position and orientation of the EEF
-    state_gripper = steps[idx]['observation']['gripper_position'].numpy() # 1D gripper position
-    state = np.concatenate([state_pr, state_gripper])
+    if dataset == 'droid':
+      state_pr = steps[idx]['observation']['cartesian_position'].numpy() # 6D position and orientation of the EEF
+      state_gripper = steps[idx]['observation']['gripper_position'].numpy() # 1D gripper position
+      state = np.concatenate([state_pr, state_gripper])
+    elif dataset == 'bridge':
+      state = steps[idx]['observation']['state'].numpy()
+
     states.append(state)
 
   # Save the video frames in torch tensor
@@ -101,7 +140,17 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys):
   # With normalization a = atan2(0,1) = 0
   action_pt[:, 3:6] = torch.atan2(torch.sin(action_pt[:, 3:6]), torch.cos(action_pt[:, 3:6]))
   
-  return video_pt, states_pt, action_pt, language_instructions
+  return video_pt, states_pt, action_pt, language_instructions, found_instrunction, video_extracted_seconds
+
+
+def dataset2path(dataset_name):
+  if dataset_name == 'droid':
+    version = '1.0.0'
+  elif dataset_name == 'language_table':
+    version = '0.0.1'
+  else:
+    version = '0.1.0'
+  return f'gs://gresearch/robotics/{dataset_name}/{version}'
 
 
     
