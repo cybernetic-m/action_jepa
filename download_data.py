@@ -29,12 +29,24 @@ def download_data(dataset_list, num_episodes_to_download, lang_keys_map, fps_lis
         ds = b.as_dataset(split='train')
 
         num_episodes_to_save = num_episodes_to_download   # num_episodes we want to save
-        saved_count = 0             # count the num of episodes saved
 
         # Take in streaming only a subset of elements (avoiding downloading in background useless episodes)
         it = iter(ds) # return the dataset iterator
 
-        pbar = tqdm(total=num_episodes_to_save, desc=f"Download {dataset} episodes", unit="ep", file=sys.stdout)
+        # List of files existed in data
+        existing_files = [f for f in os.listdir(download_dir) if f.endswith('.pt')]
+        # number of files previously saved
+        saved_count = len(existing_files)
+        print(f"{saved_count} existing episodes in {dataset} dataset")
+
+        if saved_count > 0:
+            for _ in tqdm(range(saved_count), desc=f"Skipping existing {dataset} episodes", unit="ep"):
+                try:
+                    next(it)
+                except StopIteration:
+                    break
+        
+        pbar = tqdm(total=num_episodes_to_save, initial=saved_count, desc=f"Download {dataset} episodes", unit="ep", file=sys.stdout)
 
         while saved_count<num_episodes_to_save:
             try:
@@ -65,7 +77,8 @@ def download_data(dataset_list, num_episodes_to_download, lang_keys_map, fps_lis
                 del episode
                 if video_pt is not None:
                     del video_pt, states_pt, action_pt
-                gc.collect() # Forza il recupero della memoria subito
+                tf.keras.backend.clear_session()
+                gc.collect() 
 
             except StopIteration:
                 # When the episodes from the iterator are finished, it raise a StopIteration
