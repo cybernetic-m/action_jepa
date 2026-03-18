@@ -115,7 +115,7 @@ for step in range(100):
     image = obs["agentview_image"] # get the RGB image from the agent's camera
 
     # At the moment a zero action 
-    action = [0, 0, 0, 0.1, 0.1, 0, 0] 
+    action = [0.1, 0.1, 0, 0.1, 0.1, 0, 0] 
     #print(f"Action predicted by the VLA: {action}\n")
 
     obs, reward, done, _ = env.step(action)

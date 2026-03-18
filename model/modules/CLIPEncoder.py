@@ -4,9 +4,9 @@ import numpy as np
 import torch.nn as nn
 from transformers import CLIPTokenizer, CLIPTextModel
 
-class CLIPBackbone(nn.Module):
+class CLIPEncoder(nn.Module):
     def __init__(self, model_path ,device="cpu"):
-        super(CLIPBackbone, self).__init__()
+        super(CLIPEncoder, self).__init__()
         
         # Setting the device (ex. cuda or cpu)
         self.device = device

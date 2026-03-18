@@ -5,9 +5,9 @@ import torch.nn as nn
 from transformers import AutoVideoProcessor, AutoModel
 
 
-class VJEPABackbone(nn.Module):
-    def __init__(self, model_path, device="cpu"):
-        super(VJEPABackbone, self).__init__()
+class VJEPAEncoder(nn.Module):
+    def __init__(self, model_path, frozen=True, device="cpu"):
+        super(VJEPAEncoder, self).__init__()
 
         # Setting the device (ex. cuda or cpu)
         self.device = device
@@ -21,9 +21,10 @@ class VJEPABackbone(nn.Module):
             raise FileNotFoundError(f"V-JEPA model not found in {model_path}. Run 'python download_models.py' to download it!")
         
         # Freeze the V-JEPA 2 image encoder parameters 
-        for param in self.vision_encoder.parameters():
-            param.requires_grad = False
-        self.vision_encoder.eval() # Put the encoder in evaluation mode
+        if frozen:
+            for param in self.vision_encoder.parameters():
+                param.requires_grad = False
+            self.vision_encoder.eval() # Put the encoder in evaluation mode
     
     def preprocess_frames(self, video_frames):
         # Preprocess the input frames using the processor
@@ -39,8 +40,8 @@ class VJEPABackbone(nn.Module):
 if __name__ == "__main__":
     # Example usage of the VJEPABackbone class
     model_path= "checkpoints/facebook/vjepa2-vith-fpc64-256" 
-    vjepa_encoder = VJEPABackbone(model_path=model_path, device='cuda')
-    frames = [np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8) for _ in range(16)]
+    vjepa_encoder = VJEPAEncoder(model_path=model_path, device='cuda')
+    frames = [np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8) for _ in range(4)]
     inputs = vjepa_encoder.preprocess_frames(frames)
     outputs = vjepa_encoder(inputs)
     print(outputs.shape)
