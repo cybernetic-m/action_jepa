@@ -20,6 +20,7 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import numpy as np
 import imageio 
+import robosuite as suite
 
 
 
@@ -32,6 +33,8 @@ argparse.add_argument("--render", action="store_true", help="If you want to rend
 # Configuration to use the render mode
 RENDER_MODE = argparse.parse_args().render
 RENDER_CAMERA = "agentview" # the camera name used for rendering, can be "agentview", "robot0_eye_in_hand", etc. depending on the task
+
+print("="*50 + "\n")
 print(f"[info] RENDER_MODE: {RENDER_MODE}, RENDER_CAMERA: {RENDER_CAMERA}\n")
 
 
@@ -68,6 +71,7 @@ env_args = {
     "has_offscreen_renderer": True, # If True, save images rendered to create a video 
     "use_camera_obs": True, # If True, the "obs" will include camera observations (e.g., RGB images) that can be used to create a video. 
     "render_camera": RENDER_CAMERA, # the camera name used for rendering and saving video
+    "controller": "OSC_POSE"
 }
 
 env = ControlEnv(**env_args) # create the env class
@@ -79,6 +83,11 @@ env.reset() # reset the scene and bring to initial state
 init_states = task_suite.get_task_init_states(task_id) # for benchmarking purpose, we fix the a set of initial states
 init_state_id = 10 # Among all 50 initial states you can spawn objects in different ways choosing init_state_id (it can be a int number in [0,49])
 env.set_init_state(init_states[init_state_id]) # set the init_state chosen
+
+# Invece di env.action_space, usa:
+print(f"Controller type: {env.env.robots[0].controller.name}")
+print("="*50 + "\n")
+
 
 init_action = [0.] * 7 # a start action needed for the first step, to have the first observation from the environment
 frames = [] # list used to store frames for video saving
@@ -102,12 +111,12 @@ frames = [] # list used to store frames for video saving
 obs, _, _, _ = env.step(init_action) # apply the first zero action to have the first observation from the environment
 
 for step in range(100):
-    print(f"\nStep {step}\n")
+    #print(f"\nStep {step}\n")
     image = obs["agentview_image"] # get the RGB image from the agent's camera
 
     # At the moment a zero action 
-    action = [0.1, 0, 0, 0.1, 0.1, 0, 0] 
-    print(f"Action predicted by the VLA: {action}\n")
+    action = [0, 0, 0, 0.1, 0.1, 0, 0] 
+    #print(f"Action predicted by the VLA: {action}\n")
 
     obs, reward, done, _ = env.step(action)
     if RENDER_MODE:

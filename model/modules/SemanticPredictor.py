@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 
-class Predictor(nn.Module):
+class SemanticPredictor(nn.Module):
     def __init__(self, 
                  vision_tokens = 2048, 
                  language_tokens = 77, 
@@ -15,7 +15,7 @@ class Predictor(nn.Module):
                  state_dim=7, 
                  predictor_dim = 1024, 
                  num_layers = 12):
-        super(Predictor, self).__init__()
+        super(SemanticPredictor, self).__init__()
 
         # Define the linear projector to align vision_dim, language_dim, action_dim and state_dim to the dimensione of predictor
         self.vision_proj = nn.Linear(in_features = vision_dim, out_features = predictor_dim)
