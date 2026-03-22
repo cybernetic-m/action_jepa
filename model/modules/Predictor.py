@@ -70,7 +70,7 @@ class Predictor(nn.Module):
 
         return z_next_pred
 
-
+'''
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -83,6 +83,7 @@ if __name__ == "__main__":
 
     z_next_pred = predictor(z_goal, state, action, z_obs)
     print(z_next_pred.shape)
+'''
         
         
 

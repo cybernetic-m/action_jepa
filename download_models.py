@@ -57,6 +57,7 @@ if __name__ == "__main__":
     weights_path = hf_download_models(
                     hf_model_list=[
                         "facebook/vjepa2-vith-fpc64-256",
+                        "facebook/vjepa2-vitg-fpc64-256",
                         "openai/clip-vit-large-patch14",
                         "facebook/jepa-wms/vjepa2_ac_droid.pth.tar"
                       

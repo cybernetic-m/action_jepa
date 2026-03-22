@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from modules.CLIPBackbone import CLIPBackbone
-from modules.VJEPABackbone import VJEPABackbone
+from model.modules.CLIPEncoder import CLIPBackbone
+from model.modules.VJEPAEncoder import VJEPABackbone
 from modules.Predictor import Predictor
 
 class SemanticJEPA(nn.Module):
