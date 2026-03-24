@@ -5,34 +5,44 @@ import h5py
 from tqdm import tqdm
 import glob
 import json
+import os
 
 
 def preprocess_libero_dataset(hdf5_path, output_dir):
    
+   # Create the output directory if it does not exist where to save the .pt file
+   os.makedirs(output_dir)
+
+   # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
 
-   with h5py.File(files[1], 'r') as f:
-      for demo_id in f['data'].keys():
-        demo = f['data'][demo_id]
+   # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
+   for file in files:
+    with h5py.File(file, 'r') as f:
+        for demo_id in f['data'].keys():
+          demo = f['data'][demo_id]
 
-        frames = demo['obs']['agentview_rgb'][:]
-        
-        problem_info = json.loads(f['data'].attrs['problem_info'])
-        text_instruction = problem_info['language_instruction']
+          # Take all the frames in the demo 
+          frames = demo['obs']['agentview_rgb'][:]  # (T, H, W, 3)
 
-        T, H, W, C = frames.shape
+          # Save the values T (time, num of frames), H (Height), W (Width), C (Channels)
+          T, H, W, C = frames.shape
+          
+          # problem_info is a dict of the type .. that contain 'language_instruction'
+          problem_info = json.loads(demo.attrs['problem_info'])
+          text_instruction = problem_info['language_instruction'] # the text instruction
 
-        frames_flipped = np.flip(frames[::14], axis=1)
-        gif_name = problem_info['language_instruction'].replace(" ", "_") + ".gif"
-        
-        new_size = (256, 256)
+          # Flipping all the frames vertically because the original ones are flipped
+          frames_flipped = np.flip(frames[::], axis=1)
+          
+          # Resize the frames from original size 128x128 to 256x256 size
+          new_size = (256, 256)
+          frames_resized = [] 
 
-        frames_resized = []
-
-        for t in range(len(frames_flipped)):
-            frame = frames_flipped[t]
-            resized_frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_LINEAR)
-            frames_resized.append(resized_frame)
+          for t in range(len(frames_flipped)):
+              frame = frames_flipped[t]
+              resized_frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_LINEAR)
+              frames_resized.append(resized_frame)
 
         
 
