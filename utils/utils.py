@@ -1,6 +1,40 @@
 import numpy as np
 import torch
 import cv2
+import h5py
+from tqdm import tqdm
+import glob
+import json
+
+
+def preprocess_libero_dataset(hdf5_path, output_dir):
+   
+   files = glob.glob(hdf5_path)
+
+   with h5py.File(files[1], 'r') as f:
+      for demo_id in f['data'].keys():
+        demo = f['data'][demo_id]
+
+        frames = demo['obs']['agentview_rgb'][:]
+        
+        problem_info = json.loads(f['data'].attrs['problem_info'])
+        text_instruction = problem_info['language_instruction']
+
+        T, H, W, C = frames.shape
+
+        frames_flipped = np.flip(frames[::14], axis=1)
+        gif_name = problem_info['language_instruction'].replace(" ", "_") + ".gif"
+        
+        new_size = (256, 256)
+
+        frames_resized = []
+
+        for t in range(len(frames_flipped)):
+            frame = frames_flipped[t]
+            resized_frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_LINEAR)
+            frames_resized.append(resized_frame)
+
+        
 
 
 def process_data(episode, num_frames, fps, window_second_size, lang_keys, dataset):
@@ -155,6 +189,9 @@ def dataset2path(dataset_name):
     version = '0.1.0'
   return f'gs://gresearch/robotics/{dataset_name}/{version}'
 
+
+   
+   
 
     
    
