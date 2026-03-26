@@ -6,20 +6,34 @@ from tqdm import tqdm
 import glob
 import json
 import os
+from tqdm import tqdm
 
 
-def preprocess_libero_dataset(hdf5_path, output_dir):
+def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
-   os.makedirs(output_dir)
+   os.makedirs(output_dir, exist_ok=True)
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
+   
+   # Dictionary we will save in json to remember correspondances between tasks and name id that we save
+   task_map = {}
 
    # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
-   for file in files:
-    with h5py.File(file, 'r') as f:
-        for demo_id in f['data'].keys():
+   for task_idx, file_path in enumerate(files):
+    
+    # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
+    task_name = os.path.basename(file_path).replace(".hdf5","")
+    task_map[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+
+    with h5py.File(file_path, 'r') as f:
+        # problem_info is a dict of the type .. that contain 'language_instruction'
+        problem_info = json.loads(f['data'].attrs['problem_info'])
+        text_instruction = problem_info['language_instruction'] # the text instruction
+        
+        for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
+
           demo = f['data'][demo_id]
 
           # Take all the frames in the demo 
@@ -28,9 +42,17 @@ def preprocess_libero_dataset(hdf5_path, output_dir):
           # Save the values T (time, num of frames), H (Height), W (Width), C (Channels)
           T, H, W, C = frames.shape
           
-          # problem_info is a dict of the type .. that contain 'language_instruction'
-          problem_info = json.loads(demo.attrs['problem_info'])
-          text_instruction = problem_info['language_instruction'] # the text instruction
+          # Taking the corresponding end effector cartesian position, orientation and gripper states
+          ee_pos = demo['obs']['ee_pos'][:] # (ee_x, ee_y, ee_z) three cartesian values of the end effector position
+          ee_ori = demo['obs']['ee_ori'][:] # (r_x, r_y, r_z) three values in AXIS-ANGLE representation of the end effector orientation
+          
+          # For the gripper we have originally two values (ee_g_left, ee_g_right), equal in module but different in sign: ex. (0.0360, -0.0356)
+          # that represent the opening of the left and right part of the gripper with respect to the center
+          # I take the difference and divide by 2: (ee_g_left - ee_g_right) / 2 => (0.0360 - (-0.0356))/2 = 0.0715/2 = 0.0358
+          ee_gripper_two_val = demo['obs']['gripper_states'][:] 
+          ee_gripper = (ee_gripper_two_val[:,0] - ee_gripper_two_val[:,-1])/2
+          ee_gripper = ee_gripper.reshape(-1, 1)
+          ee_states = np.concatenate([ee_pos, ee_ori, ee_gripper], axis=1)
 
           # Flipping all the frames vertically because the original ones are flipped
           frames_flipped = np.flip(frames[::], axis=1)
@@ -41,8 +63,21 @@ def preprocess_libero_dataset(hdf5_path, output_dir):
 
           for t in range(len(frames_flipped)):
               frame = frames_flipped[t]
-              resized_frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_LINEAR)
+              resized_frame = cv2.resize(frame, new_size, interpolation=interpolation)
               frames_resized.append(resized_frame)
+          
+          data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
+                  "text_instruction": text_instruction,
+                  "ee_states": torch.from_numpy(ee_states).float()
+                  }
+          
+          # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
+          save_name = f"task_{task_idx}_{demo_id}.pt"
+          torch.save(data, os.path.join(output_dir, save_name))
+   
+   # Saving the correspondance map in json file
+   with open(os.path.join(output_dir, 'task_map.json'), 'w') as f:
+    json.dump(task_map, f)
 
         
 

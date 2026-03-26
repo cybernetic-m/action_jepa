@@ -215,3 +215,4 @@ myenv
 checkpoints 
 # To not push data
 data
+processed_data
