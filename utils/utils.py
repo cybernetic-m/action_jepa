@@ -2,11 +2,13 @@ import numpy as np
 import torch
 import cv2
 import h5py
-from tqdm import tqdm
 import glob
 import json
 import os
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from scipy.spatial.transform import Rotation as R
 
 
 def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_LINEAR):
@@ -79,9 +81,90 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
    with open(os.path.join(output_dir, 'task_map.json'), 'w') as f:
     json.dump(task_map, f)
 
-        
+def demo_visualization(demo_pt_path):
+  
+  # Load the demo from the path as a dictionary
+  demo = torch.load(demo_pt_path)
+
+  # Load frames, text and end effector states tensors and transform in numpy
+  frames = demo["frames"].numpy() # (steps, 256,256,3)
+  text_instruction = demo["text_instruction"] # is text
+  ee_states = demo["ee_states"] # (steps, 7)
+
+  # Extract traj (trajectory), ori (axis-angle orientation), gripper (gripper open/close values)
+  traj = ee_states[:, :3]
+  ori = ee_states[:, 3:6]
+  gripper = ee_states[:, 6]
+
+  # Normalize values of gripper between [0,1] only for visualization of a bar plot
+  gripper_norm = (gripper - gripper.min())/(gripper.max() - gripper.min()) 
+
+  # Create a plot with 2x2 cells
+  fig = plt.figure(figsize=(16,7))
+  grid = fig.add_gridspec(2,2, width_ratios=[1.2,1], height_ratios=[1, 0.3])
+
+  # Create the subplots 
+  # upper left: the video gif
+  # upper right: a 3D plot of the trajectory and orientation (as a ref frame that rotate) of the end effector
+  # lower right: a bar plot to indicate the opening and closing of the end effector
+  ax_video = fig.add_subplot(grid[0,0])
+  ax_3dplot = fig.add_subplot(grid[0,1], projection='3d') # projection 3d means not a flat plot but 3d plot
+  ax_gripper = fig.add_subplot(grid[1,1]) # this is an horizontal bar under the 3d plot to indicate the opening and closing of the gripper
+
+  # Initialization of the ax_video
+  ax_video.axis("off") # for the video we do not show axis
+  im = ax_video.imshow(frames[0]) # initialization with first frame
+  ax_video.set_title(f"Instruction: {text_instruction}", fontsize=12) # Show as title the text instruction
+
+  # Initialization of the ax_3dplot
+  # q_x, q_y, q_z are the three vectors of the reference frame
+  ax_3dplot.scatter(xs=traj[:,0], ys=traj[:,1], zs=traj[:,2], c=np.arange(len(traj)), cmap='jet', s=2, alpha=0.3) # scatter plot of point in the trajectory
+  q_x = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='r', length=0.08)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
+  q_y = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='g', length=0.08)
+  q_z = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='b', length=0.08)
+
+  # Initialization of the ax_gripper
+  ax_gripper.set_title("Gripper")
+  ax_gripper.set_xlim(0,1)  # initialize a bar from 0 to 1
+  ax_gripper.set_yticks([]) # no y ticks
+  ax_gripper.set_xticks([0,1]) # two ticks for the x axis
+  ax_gripper.set_xticklabels(['Closed', 'Open'])
+  bar = ax_gripper.barh(y=[0], width=[gripper_norm[0]], color='orange', height=0.2) # initialization of the bar
+
+  # define a nested "update" function to update ax_video, ax_3dplot and ax_gripper (t is the step)
+  def update(t):
+
+    # Update the ax_video
+    im.set_array(frames[t])
+
+    # Update of the ax_3dplot
+    nonlocal q_x, q_y, q_z  # nonlocal says to update the previous defined variables
+    # Firstly remove the previous arrows
+    q_x.remove()
+    q_y.remove()
+    q_z.remove()
+    # Extract the pos (x,y,z values where to origin the vectors at frame t)
+    pos = traj[t]
+    # Extract the ori Axis Angle values and build the corresponding rotation Matrix
+    # the columns of the Rotation Matrix are orthonormal vector that compose the U,V,W components in quiver!
+    # R_Matrix = [q_x, q_y, q_z], each vector is a column! It means we take U,V,W as the components of that column
+    R_Matrix = R.from_rotvec(ori[t]).as_matrix()
+    q_x = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,0], V=R_Matrix[1,0], W=R_Matrix[2,0], color='r', length=0.08)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
+    q_y = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,1], V=R_Matrix[1,1], W=R_Matrix[2,1], color='g', length=0.08)
+    q_z = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,2], V=R_Matrix[1,2], W=R_Matrix[2,2], color='b', length=0.08)
+
+    # Update of the ax_gripper
+    bar[0].set_width(gripper_norm[t])
+
+    return im, q_x, q_y, q_z, bar
+  
+  ani = FuncAnimation(fig=fig, func=update, frames=range(0, len(frames), 5), interval=50, blit=False)
+  plt.tight_layout()
+  plt.show()
+  return ani
 
 
+'''
 def process_data(episode, num_frames, fps, window_second_size, lang_keys, dataset):
   # Function that having
 
@@ -124,14 +207,14 @@ def process_data(episode, num_frames, fps, window_second_size, lang_keys, datase
   lang_dict = {key: "" for key in lang_keys}
   found_instruction = False
 
-  '''
+
   if dataset == 'droid':
     # Take all language instructions and create a list with all the texts
     language_instructions = [steps[0][key].numpy().decode('utf-8') for key in lang_keys]
     print(language_instructions)
   elif dataset == 'bridge':
     language_instructions = [steps[0]['observation'][key].numpy().decode('utf-8') for key in lang_keys]
-'''
+
 
   
   #num_steps = len(steps) # num of total steps of the episode (we have 1 frame RGB per step)
@@ -233,7 +316,7 @@ def dataset2path(dataset_name):
   else:
     version = '0.1.0'
   return f'gs://gresearch/robotics/{dataset_name}/{version}'
-
+'''
 
    
    
