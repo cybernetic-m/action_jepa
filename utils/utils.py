@@ -101,7 +101,7 @@ def demo_visualization(demo_pt_path):
 
   # Create a plot with 2x2 cells
   fig = plt.figure(figsize=(16,7))
-  grid = fig.add_gridspec(2,2, width_ratios=[1.2,1], height_ratios=[1, 0.3])
+  grid = fig.add_gridspec(2,2, width_ratios=[1,1], height_ratios=[1, 0.1])
 
   # Create the subplots 
   # upper left: the video gif
@@ -118,7 +118,7 @@ def demo_visualization(demo_pt_path):
 
   # Initialization of the ax_3dplot
   # q_x, q_y, q_z are the three vectors of the reference frame
-  ax_3dplot.scatter(xs=traj[:,0], ys=traj[:,1], zs=traj[:,2], c=np.arange(len(traj)), cmap='jet', s=2, alpha=0.3) # scatter plot of point in the trajectory
+  ax_3dplot.plot(traj[:,0], traj[:,1], traj[:,2], 'k--', alpha=0.2) # scatter plot of point in the trajectory
   q_x = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='r', length=0.08)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
   q_y = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='g', length=0.08)
   q_z = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='b', length=0.08)
@@ -128,8 +128,8 @@ def demo_visualization(demo_pt_path):
   ax_gripper.set_xlim(0,1)  # initialize a bar from 0 to 1
   ax_gripper.set_yticks([]) # no y ticks
   ax_gripper.set_xticks([0,1]) # two ticks for the x axis
-  ax_gripper.set_xticklabels(['Closed', 'Open'])
-  bar = ax_gripper.barh(y=[0], width=[gripper_norm[0]], color='orange', height=0.2) # initialization of the bar
+  ax_gripper.set_xticklabels(['Open', 'Closed'])
+  bar = ax_gripper.barh(y=[0], width=[gripper_norm[0]], color='orange', height=0.1) # initialization of the bar
 
   # define a nested "update" function to update ax_video, ax_3dplot and ax_gripper (t is the step)
   def update(t):
@@ -158,9 +158,10 @@ def demo_visualization(demo_pt_path):
 
     return im, q_x, q_y, q_z, bar
   
-  ani = FuncAnimation(fig=fig, func=update, frames=range(0, len(frames), 5), interval=50, blit=False)
-  plt.tight_layout()
-  plt.show()
+  step = 5
+  ani = FuncAnimation(fig=fig, func=update, frames=range(0, len(frames), step), interval=50*step, blit=False)
+  #plt.tight_layout()
+  #plt.show()
   return ani
 
 
