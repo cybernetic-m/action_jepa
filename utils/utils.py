@@ -8,8 +8,11 @@ import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import matplotlib as mpl
 from scipy.spatial.transform import Rotation as R
+import textwrap
 
+mpl.rcParams['animation.embed_limit'] = 100.0
 
 def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_LINEAR):
    
@@ -18,6 +21,9 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
+
+   if not files:
+      raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
    
    # Dictionary we will save in json to remember correspondances between tasks and name id that we save
    task_map = {}
@@ -81,7 +87,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
    with open(os.path.join(output_dir, 'task_map.json'), 'w') as f:
     json.dump(task_map, f)
 
-def demo_visualization(demo_pt_path):
+def demo_animator(demo_pt_path):
   
   # Load the demo from the path as a dictionary
   demo = torch.load(demo_pt_path)
@@ -114,22 +120,62 @@ def demo_visualization(demo_pt_path):
   # Initialization of the ax_video
   ax_video.axis("off") # for the video we do not show axis
   im = ax_video.imshow(frames[0]) # initialization with first frame
-  ax_video.set_title(f"Instruction: {text_instruction}", fontsize=12) # Show as title the text instruction
+  instruction_wrapped = "\n".join(textwrap.wrap(f"Instruction: {text_instruction}", width=50))
+  ax_video.set_title(f"{instruction_wrapped}", fontsize=12) # Show as title the text instruction
 
   # Initialization of the ax_3dplot
   # q_x, q_y, q_z are the three vectors of the reference frame
-  ax_3dplot.plot(traj[:,0], traj[:,1], traj[:,2], 'k--', alpha=0.2) # scatter plot of point in the trajectory
-  q_x = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='r', length=0.08)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
-  q_y = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='g', length=0.08)
-  q_z = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='b', length=0.08)
+  ax_3dplot.plot(traj[:,0], traj[:,1], traj[:,2], 'k--', alpha=0.8, zorder=1) # scatter plot of point in the trajectory
+  q_x = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='r', length=0.05, zorder=5)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
+  q_y = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='g', length=0.05, zorder=5)
+  q_z = ax_3dplot.quiver(X=0, Y=0, Z=0, U=0, V=0, W=0, color='b', length=0.05, zorder=5)
+
+  ax_3dplot.view_init(elev=15, azim=45) # orientation of the 3D view
+  ax_3dplot.set_xlabel('X [m]') # setting labels X, Y, Z for all axis
+  ax_3dplot.set_ylabel('Y [m]')
+  ax_3dplot.set_zlabel('Z [m]')
+
+  # Select indices of steps where the gripper change the state (from Open (1) -> Closed (0) or viceversa)
+  # change_state is a list formed by 0 where the robot gripper do not change the state or +1 (Open->Closed) and -1 (Closed -> Open)
+  is_closed = gripper_norm < 0.7  # List of boolean False,True depending if the value is greater or less of 0.7
+  change_state = np.diff(is_closed.int()) # transforming False = 0 and True = 1 and doing differences of element at next position minus element at current position
+  indices_open = np.where(change_state == -1)[0] # returning the indices where we have -1 (from Closed -> Open)
+  indices_closed = np.where(change_state == 1)[0] # returning the indices where we have +1 (from Open -> Closed)
+
+  # Create four invisible line with color r, g, b and labels for the legend of orientaton axis and orange for the gripper closed legend
+  line_x = ax_3dplot.plot([], [], [], color='r', label='X-axis')[0]
+  line_y = ax_3dplot.plot([], [], [], color='g', label='Y-axis')[0]
+  line_z = ax_3dplot.plot([], [], [], color='b', label='Z-axis')[0]
+  line_gripper_closed = ax_3dplot.plot([], [], [], 'o', color='magenta', label='Gripper open Point')[0]
+  line_gripper_open = ax_3dplot.plot([], [], [], 'o', color='cyan', label='Gripper closed Point')[0]
+
+  # legend take all elements with label (the three lines) and add to a legend block upper right
+  ax_3dplot.legend(loc='upper right', fontsize=10)
+
+  # Imposta il rapporto tra gli assi a 1:1:1
+  ax_3dplot.set_box_aspect([1,1,1])
+
+  # Draw in the trajectory all the point in which the gripper is closed
+  if len(indices_open) > 0:
+      ax_3dplot.scatter(traj[indices_open, 0], 
+                        traj[indices_open, 1], 
+                        traj[indices_open, 2], 
+                        color='magenta', s=50, label='Gripper Open', zorder=5)
+      
+  if len(indices_closed) > 0:
+    ax_3dplot.scatter(traj[indices_closed, 0], 
+                      traj[indices_closed, 1], 
+                      traj[indices_closed, 2], 
+                      color='cyan', s=50, label='Gripper Closed', zorder=5)
+
 
   # Initialization of the ax_gripper
   ax_gripper.set_title("Gripper")
   ax_gripper.set_xlim(0,1)  # initialize a bar from 0 to 1
   ax_gripper.set_yticks([]) # no y ticks
   ax_gripper.set_xticks([0,1]) # two ticks for the x axis
-  ax_gripper.set_xticklabels(['Open', 'Closed'])
-  bar = ax_gripper.barh(y=[0], width=[gripper_norm[0]], color='orange', height=0.1) # initialization of the bar
+  ax_gripper.set_xticklabels(['Closed', 'Open'])
+  bar = ax_gripper.barh(y=[0], width=[gripper_norm[0]], color='black', height=0.1) # initialization of the bar
 
   # define a nested "update" function to update ax_video, ax_3dplot and ax_gripper (t is the step)
   def update(t):
@@ -138,7 +184,7 @@ def demo_visualization(demo_pt_path):
     im.set_array(frames[t])
 
     # Update of the ax_3dplot
-    nonlocal q_x, q_y, q_z  # nonlocal says to update the previous defined variables
+    nonlocal q_x, q_y, q_z # nonlocal says to update the previous defined variables
     # Firstly remove the previous arrows
     q_x.remove()
     q_y.remove()
@@ -149,19 +195,18 @@ def demo_visualization(demo_pt_path):
     # the columns of the Rotation Matrix are orthonormal vector that compose the U,V,W components in quiver!
     # R_Matrix = [q_x, q_y, q_z], each vector is a column! It means we take U,V,W as the components of that column
     R_Matrix = R.from_rotvec(ori[t]).as_matrix()
-    q_x = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,0], V=R_Matrix[1,0], W=R_Matrix[2,0], color='r', length=0.08)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
-    q_y = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,1], V=R_Matrix[1,1], W=R_Matrix[2,1], color='g', length=0.08)
-    q_z = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,2], V=R_Matrix[1,2], W=R_Matrix[2,2], color='b', length=0.08)
+    q_x = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,0], V=R_Matrix[1,0], W=R_Matrix[2,0], color='r', length=0.05)  # x,y,z are the point of origin of the vector, u,v,w are the components of the vector
+    q_y = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,1], V=R_Matrix[1,1], W=R_Matrix[2,1], color='g', length=0.05)
+    q_z = ax_3dplot.quiver(X=pos[0], Y=pos[1], Z=pos[2], U=R_Matrix[0,2], V=R_Matrix[1,2], W=R_Matrix[2,2], color='b', length=0.05)
 
     # Update of the ax_gripper
     bar[0].set_width(gripper_norm[t])
 
     return im, q_x, q_y, q_z, bar
   
-  step = 5
-  ani = FuncAnimation(fig=fig, func=update, frames=range(0, len(frames), step), interval=50*step, blit=False)
-  #plt.tight_layout()
-  #plt.show()
+  ani = FuncAnimation(fig=fig, func=update, frames=len(frames), interval=50, blit=False)
+  plt.tight_layout()
+  plt.close(fig)
   return ani
 
 
