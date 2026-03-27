@@ -12,12 +12,13 @@ import matplotlib as mpl
 from scipy.spatial.transform import Rotation as R
 import textwrap
 
-mpl.rcParams['animation.embed_limit'] = 100.0
+mpl.rcParams['animation.embed_limit'] = 500.0
 
 def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
-   os.makedirs(output_dir, exist_ok=True)
+   dataset_name = hdf5_path.split('/')[3] # extract the name of the dataset ex: "libero_10", "libero_goal"...
+   os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
@@ -81,7 +82,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
           
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
-          torch.save(data, os.path.join(output_dir, save_name))
+          torch.save(data, os.path.join(output_dir, dataset_name, save_name))
    
    # Saving the correspondance map in json file
    with open(os.path.join(output_dir, 'task_map.json'), 'w') as f:
