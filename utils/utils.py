@@ -27,14 +27,18 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
       raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
    
    # Dictionary we will save in json to remember correspondances between tasks and name id that we save
-   task_map = {}
+   task_info = {}
+   
+   # We discard the demo in which the task is not finished as "non_success" and we count how much there are
+   count_success = 0
+   count_nonsuccess = 0
 
    # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
    for task_idx, file_path in enumerate(files):
     
     # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
     task_name = os.path.basename(file_path).replace(".hdf5","")
-    task_map[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+    task_info[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
 
     with h5py.File(file_path, 'r') as f:
         # problem_info is a dict of the type .. that contain 'language_instruction'
@@ -44,6 +48,27 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
         for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
 
           demo = f['data'][demo_id]
+          
+          # We take the dones = [0, 0, 0, ...., 1] if there is one at last step, is success!
+          # We use it to discard non success demo
+          dones = demo['dones'][:]
+          is_success = (dones[-1] == 1) # True if there is 1 at last step
+
+          # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
+          # where D means delta values of translations (first three), axis angle orientation (second three)
+          # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
+          actions = demo['actions'][:]
+
+          # We will save also the joint states
+          joint_states = demo['obs']['joint_states'][:]
+          
+          # If there is not a success we increment the counter of non success and skip this demo
+          # otherwise we increment the success counter and take this demo
+          if not is_success:
+            count_nonsuccess +=1
+            continue
+
+          count_success += 1
 
           # Take all the frames in the demo 
           frames = demo['obs']['agentview_rgb'][:]  # (T, H, W, 3)
@@ -77,16 +102,22 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
           
           data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
                   "text_instruction": text_instruction,
-                  "ee_states": torch.from_numpy(ee_states).float()
+                  "ee_states": torch.from_numpy(ee_states).float(),
+                  "joint_states": torch.from_numpy(joint_states).float(),
+                  "actions": torch.from_numpy(actions).float(),
+                  "success": torch.tensor(is_success, dtype=torch.bool)
                   }
           
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
           torch.save(data, os.path.join(output_dir, dataset_name, save_name))
    
+   task_info['success_demo'] = count_success
+   task_info['non_success_demo'] = count_nonsuccess
+
    # Saving the correspondance map in json file
-   with open(os.path.join(output_dir, 'task_map.json'), 'w') as f:
-    json.dump(task_map, f)
+   with open(os.path.join(output_dir, dataset_name, 'task_info.json'), 'w') as f:
+    json.dump(task_info, f)
 
 def demo_animator(demo_pt_path):
   
