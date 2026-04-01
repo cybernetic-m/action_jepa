@@ -20,9 +20,6 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import numpy as np
 import imageio 
-import robosuite as suite
-
-
 
 # Argument parsing to configure rendering
 # You can run the script with "python main.py --render" to render the simulation.
@@ -110,12 +107,12 @@ frames = [] # list used to store frames for video saving
 
 obs, _, _, _ = env.step(init_action) # apply the first zero action to have the first observation from the environment
 
-for step in range(100):
+for step in range(200):
     #print(f"\nStep {step}\n")
     image = obs["agentview_image"] # get the RGB image from the agent's camera
 
     # At the moment a zero action 
-    action = [0., 0.05625, -0.01875,  0,  0, -0, -1] 
+    action = [0]*7
     #print(f"Action predicted by the VLA: {action}\n")
 
     obs, reward, done, _ = env.step(action)

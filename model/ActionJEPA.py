@@ -13,7 +13,7 @@ class ActionJEPA(nn.Module):
                  vjepa_encoder_path, 
                  vjepa_predictor_path,
                  clip_model_path,
-                 num_frames=4,
+                 num_frames=16,
                  vision_dim = 1408,
                  language_dim=768,
                  action_dim = 7, 
@@ -88,11 +88,11 @@ class ActionJEPA(nn.Module):
 
         # Passing the input to the actor
         
-        a_actor_seq = torch.stack(actor_actions_list, dim=1)
-        print(f"a_actor_seq: {a_actor_seq.shape}")
-        actor_action = a_actor_seq[:, -1, :]
+        actor_action_seq = torch.stack(actor_actions_list, dim=1)
+        print(f"a_actor_seq: {actor_action_seq.shape}")
+        #actor_action = actor_action_seq[:, -1, :]
 
-        z_pred_tokens, _, _ = self.predictor(z_obs, a_actor_seq)
+        z_pred_tokens, _, _ = self.predictor(z_obs, actor_action_seq)
         print(f"z_pred_tokens: {z_pred_tokens.shape}")
         z_pred_mean = z_pred_tokens.mean(dim=1)
         print(f"z_pred_mean: {z_pred_mean.shape}")
@@ -108,7 +108,7 @@ class ActionJEPA(nn.Module):
         refiner_action = self.refiner(refiner_input)
         print(f"refiner_action: {refiner_action.shape}")
 
-        return actor_action, refiner_action
+        return actor_action_seq, refiner_action
             
 if __name__ == "__main__":
     
@@ -122,13 +122,13 @@ if __name__ == "__main__":
         vjepa_encoder_path=vjepa_path,
         vjepa_predictor_path=vjepa_pred_path,
         clip_model_path=clip_path,
-        num_frames=4,
+        num_frames=16,
         device=device
     ).to(device)
 
     # --- TEST 1: MODO INFERENZA (Dati Grezzi) ---
     # Simuliamo 6 frame (H=224, W=224) e una stringa di testo
-    raw_frames = [np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8) for _ in range(4)]
+    raw_frames = [np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8) for _ in range(16)]
     raw_text = "Pick up the red cube"
 
     # Forward pass
@@ -138,12 +138,12 @@ if __name__ == "__main__":
     print(f"Actor: {a1_inf.shape}")   
     print(f"Refiner: {a2_inf.shape}") 
 
-    z_obs_batch = torch.randn(1, 512, 1408).to(device)
-    z_text_batch = torch.randn(1, 77, 768).to(device)
+    #z_obs_batch = torch.randn(1, 512, 1408).to(device)
+    #z_text_batch = torch.randn(1, 77, 768).to(device)
 
-    a1_train, a2_train = model(z_text_batch, z_obs_batch)
+    #a1_train, a2_train = model(z_text_batch, z_obs_batch)
 
-    print(f"Batch Actor: {a1_train.shape}")   
-    print(f"Batch Refiner: {a2_train.shape}") 
+    #print(f"Batch Actor: {a1_train.shape}")   
+    #print(f"Batch Refiner: {a2_train.shape}") 
 
   
