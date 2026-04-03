@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+import torch.nn.functional as F
 
 def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0, lambda_refiner = 1.0, validation = False):
     
@@ -17,14 +18,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
     epoch_loss = 0 
     epoch_loss_actor = 0
     epoch_loss_refiner = 0
-
-    # Lists of the refiner target and pred actions
-    refiner_action_target_list = []
-    refiner_action_pred_list = []
-
-    # Lists of the actor target and pred actions
-    actor_action_seq_target_list = []
-    actor_action_seq_pred_list = []  
+    epoch_mae_xyz = 0   # it's the mean absolute error for the position xyz of the gripper
+    epoch_mae_gripper = 0 # it's the mean absolute error for the gripper [0;2] (gripper are in range -1,1)
+    epoch_cosim_ori = 0 # it's the cosine similarity between the orientation vectors target and predicted
 
     pbar = tqdm(dataloader, desc=f"Validation" if validation else "Training")  
 
@@ -38,21 +34,24 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
             actor_action_seq_target = batch['actor_action_seq_target'].to(device)
             refiner_action_target = batch['refiner_action_target'].to(device)
 
-            # Appending to lists the target values
-            actor_action_seq_target_list.append(actor_action_seq_target.detach().cpu())
-            refiner_action_target_list.append(refiner_action_target.detach().cpu())
-
+        
             # Making the predictions
             actor_action_seq_pred, refiner_action_pred = model(text_instruction, frames)
-
-            # Appending to lists the predicted values
-            actor_action_seq_pred_list.append(actor_action_seq_pred.detach().cpu())
-            refiner_action_pred_list.append(refiner_action_pred.detach().cpu())
 
             # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
             loss_actor = loss_fn(actor_action_seq_pred, actor_action_seq_target)
             loss_refiner = loss_fn(refiner_action_pred, refiner_action_target)
             loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner)
+
+            with torch.no_grad():
+                # MAE XYZ
+                mae_xyz = torch.abs(refiner_action_pred[:, :3] - refiner_action_target[:, :3]).mean()
+                
+                # MAE Gripper
+                mae_grip = torch.abs(refiner_action_pred[:, -1] - refiner_action_target[:, -1]).mean()
+                
+                # Cosine similarity
+                cosim_ori = F.cosine_similarity(refiner_action_pred[:, 3:6], refiner_action_target[:, 3:6], dim=-1).mean()
                         
             if not validation:
                 # Zeroing the gradient
@@ -68,6 +67,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
             epoch_loss += loss.item()
             epoch_loss_actor += loss_actor.item()
             epoch_loss_refiner += loss_refiner.item()
+            epoch_mae_xyz += mae_xyz.item()
+            epoch_mae_gripper += mae_grip.item()
+            epoch_cosim_ori += cosim_ori.item()
 
             # Updating values in the bar
             pbar.set_postfix({
@@ -79,7 +81,20 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
         loss_epoch_avg = epoch_loss / len(dataloader)
         loss_epoch_actor_avg = epoch_loss_actor / len(dataloader)
         loss_epoch_refiner_avg = epoch_loss_refiner / len(dataloader)
+        epoch_mae_xyz = epoch_mae_xyz / len(dataloader)
+        epoch_mae_gripper = epoch_mae_gripper / len(dataloader)
+        epoch_cosim_ori = epoch_cosim_ori / len(dataloader)
+
+        metrics = {
+            'loss': loss_epoch_avg,
+            'loss_actor': loss_epoch_actor_avg,
+            'loss_refiner': loss_epoch_refiner_avg,
+            'mae_xyz': epoch_mae_xyz,
+            'mae_gripper': epoch_mae_gripper,
+            'cosim_ori': epoch_cosim_ori
+
+        }
     
-    return (loss_epoch_avg, loss_epoch_actor_avg, loss_epoch_refiner_avg, refiner_action_target_list, refiner_action_pred_list, actor_action_seq_target_list, actor_action_seq_pred_list)
+    return metrics
 
             
