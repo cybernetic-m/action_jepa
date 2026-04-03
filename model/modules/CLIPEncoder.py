@@ -47,7 +47,7 @@ class CLIPEncoder(nn.Module):
 
 
 
-'''
+
 if __name__ == "__main__":
     model_path = "checkpoints/openai/clip-vit-large-patch14"
     clipencoder = CLIPEncoder(model_path=model_path, device="cuda")
@@ -55,4 +55,3 @@ if __name__ == "__main__":
     text_tokens = clipencoder.tokenization(text)
     outputs = clipencoder(text_tokens)
     print(outputs.shape)
-'''

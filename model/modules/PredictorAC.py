@@ -51,7 +51,6 @@ class PredictorAC(nn.Module):
                     new_state_dict[k] = v
 
             self.predictor.load_state_dict(state_dict=new_state_dict)
-            print(self.predictor)
         else:
             raise FileNotFoundError(f"V-JEPA AC Predictor not found in {model_path}. Run 'python download_models.py' to download it!")
         

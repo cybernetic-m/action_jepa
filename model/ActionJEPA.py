@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import numpy as np
 from transformers import AutoModel
-from modules.PredictorAC import PredictorAC
-from modules.CLIPEncoder import CLIPEncoder
-from modules.VJEPAEncoder import VJEPAEncoder
-from modules.MLP import MLP
+from model.modules.PredictorAC import PredictorAC
+from model.modules.CLIPEncoder import CLIPEncoder
+from model.modules.VJEPAEncoder import VJEPAEncoder
+from model.modules.MLP import MLP
 from src.models.utils.modules import build_action_block_causal_attention_mask
 
 class ActionJEPA(nn.Module):
@@ -17,6 +17,7 @@ class ActionJEPA(nn.Module):
                  vision_dim = 1408,
                  language_dim=768,
                  action_dim = 7, 
+                 use_backbone = True,
                  device="cuda"):
         super(ActionJEPA, self).__init__()
 
@@ -25,9 +26,14 @@ class ActionJEPA(nn.Module):
         self.language_dim = language_dim
         self.action_dim = action_dim
         self.num_frames = num_frames
+        self.use_backbone = use_backbone
         
-        self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, device=device)
-        self.language_backbone = CLIPEncoder(model_path=clip_model_path, device=device)
+        if self.use_backbone:
+            self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, device=device)
+            self.language_backbone = CLIPEncoder(model_path=clip_model_path, device=device)
+        else:
+            self.vision_backbone = None
+            self.language_backbone = None
 
         self.predictor = PredictorAC(model_path=vjepa_predictor_path, device=device)
         self.T = self.num_frames // 2           
@@ -45,70 +51,84 @@ class ActionJEPA(nn.Module):
         self.refiner = MLP(input_dim=vision_dim*3, hidden_dims=[1024, 512, 256], output_dim=action_dim)
 
     def forward(self, text_input, vision_input):
-        
-        if torch.is_tensor(vision_input) and vision_input.dim() == 3:
-            z_obs = vision_input
-        else:
+            
+        if self.use_backbone:
             z_frames = self.vision_backbone.preprocess_frames(vision_input)
-            print(f"z_frames: {z_frames.shape}")
+            #print(f"z_frames: {z_frames.shape}")
             z_obs = self.vision_backbone(z_frames)
-            print(f"z_obs: {z_obs.shape}")
+            #print(f"z_obs: {z_obs.shape}")
+        else: 
+            z_obs = vision_input.to(self.device) if torch.is_tensor(vision_input) else vision_input
+            #print(f"z_obs: {z_obs.shape}")
         
         B, N, D = z_obs.shape
       
-        if torch.is_tensor(text_input) and text_input.dim() == 3:
-            z_text = text_input
-        else:
+        if self.use_backbone:
             z_tokens = self.language_backbone.tokenization(text_input)
-            print(f"z_tokens: {z_tokens}")
+            #print(f"z_tokens: {z_tokens}")
             z_text = self.language_backbone(z_tokens)
-            print(f"z_text: {z_text.shape}")
+            #print(f"z_text: {z_text.shape}")
+        else:
+            z_text = text_input.to(self.device) if torch.is_tensor(text_input) else text_input
+            #print(f"z_text: {z_text.shape}")
 
         # Computing mean values to pooling in the sequence of tokens in 1 token
         #z_obs_mean = z_obs.mean(dim=1)
         #print(f"z_obs_mean: {z_obs_mean.shape}")
+        if z_text.dim() == 4:
+            z_text = z_text.squeeze(1)
         z_text_mean = z_text.mean(dim=1)
-        print(f"z_text_mean: {z_text_mean.shape}")
+        #print(f"z_text_mean: {z_text_mean.shape}")
         
         # Project the text mean token to the same dimensionality of the V JEPA 2 Encoding 
         z_text_projected = self.language_projector(z_text_mean)
-        print(f"z_text_projected: {z_text_projected.shape}")
+        #print(f"z_text_projected: {z_text_projected.shape}")
 
         z_obs_t = z_obs.view(B, self.T, 256, D)
-        print(f"z_obs_t: {z_obs_t.shape}")
+        #print(f"z_obs_t: {z_obs_t.shape}")
         actor_actions_list = []
         for t in range(self.T):
             z_obs_t_mean = z_obs_t[:, t, :, :].mean(dim=1)
-            print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
+            #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
             actor_input_t = torch.cat([z_obs_t_mean, z_text_projected], dim=-1)
-            print(f"actor_input: {actor_input_t.shape}")
+            #print(f"actor_input: {actor_input_t.shape}")
             actor_action_t = self.actor(actor_input_t)
-            print(f"a_actor: {actor_action_t.shape}")
+            #print(f"a_actor: {actor_action_t.shape}")
             actor_actions_list.append(actor_action_t)
 
         # Passing the input to the actor
         
         actor_action_seq = torch.stack(actor_actions_list, dim=1)
-        print(f"a_actor_seq: {actor_action_seq.shape}")
+        #print(f"a_actor_seq: {actor_action_seq.shape}")
         #actor_action = actor_action_seq[:, -1, :]
 
         z_pred_tokens, _, _ = self.predictor(z_obs, actor_action_seq)
-        print(f"z_pred_tokens: {z_pred_tokens.shape}")
+        #print(f"z_pred_tokens: {z_pred_tokens.shape}")
         z_pred_mean = z_pred_tokens.mean(dim=1)
-        print(f"z_pred_mean: {z_pred_mean.shape}")
+        #print(f"z_pred_mean: {z_pred_mean.shape}")
         
         z_obs_final = z_obs[:, -256:, :].mean(dim=1)
-        print(f"z_obs_final: {z_obs_final.shape}")
+        #print(f"z_obs_final: {z_obs_final.shape}")
         z_pred_final = z_pred_tokens[:, -256:, :].mean(dim=1)
-        print(f"z_pred_final: {z_pred_final.shape}")
+        #print(f"z_pred_final: {z_pred_final.shape}")
         
         # Creating the input for the refiner as obs, text and prediction
         refiner_input = torch.cat([z_obs_final, z_text_projected, z_pred_final], dim=-1)
-        print(f"refiner_input: {refiner_input.shape}")
+        #print(f"refiner_input: {refiner_input.shape}")
         refiner_action = self.refiner(refiner_input)
-        print(f"refiner_action: {refiner_action.shape}")
+        #print(f"refiner_action: {refiner_action.shape}")
 
         return actor_action_seq, refiner_action
+    
+    def print_model_info(self):
+        print("MODEL INFO:\n")
+        if self.use_backbone:
+            print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}\n{self.vision_backbone}")
+            print(f"LANGUAGE BACKBONE {self.language_backbone.__class__.__name__}\n{self.language_backbone}")
+        print(f"PREDICTOR NETWORK:\n{self.predictor}")
+        print(f"ACTOR NETWORK:\n{self.actor}")
+        print(f"REFINER NETWORK:\n{self.refiner}")
+
             
 if __name__ == "__main__":
     

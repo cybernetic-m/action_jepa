@@ -14,7 +14,7 @@ import textwrap
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_LINEAR):
+def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone, language_backbone, num_frames, use_backbone = False, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
    dataset_name = hdf5_path.split('/')[3] # extract the name of the dataset ex: "libero_10", "libero_goal"...
@@ -33,6 +33,11 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
    count_success = 0
    count_nonsuccess = 0
 
+   # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
+   if use_backbone:
+    device = vision_backbone.device
+    print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
+
    # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
    for task_idx, file_path in enumerate(files):
     
@@ -44,6 +49,12 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
         # problem_info is a dict of the type .. that contain 'language_instruction'
         problem_info = json.loads(f['data'].attrs['problem_info'])
         text_instruction = problem_info['language_instruction'] # the text instruction
+
+        # Preprocessing using the CLIP ENCODER backbone if needed
+        if use_backbone:
+          with torch.no_grad():
+            z_tokens = language_backbone.tokenization(text_instruction)
+            z_text = language_backbone(z_tokens).cpu()
         
         for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
 
@@ -99,14 +110,36 @@ def preprocess_libero_dataset(hdf5_path, output_dir, interpolation = cv2.INTER_L
               frame = frames_flipped[t]
               resized_frame = cv2.resize(frame, new_size, interpolation=interpolation)
               frames_resized.append(resized_frame)
-          
-          data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
-                  "text_instruction": text_instruction,
-                  "ee_states": torch.from_numpy(ee_states).float(),
-                  "joint_states": torch.from_numpy(joint_states).float(),
-                  "actions": torch.from_numpy(actions).float(),
-                  "success": torch.tensor(is_success, dtype=torch.bool)
-                  }
+
+          # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
+          if use_backbone:
+            z_obs_list = []
+            for i in range(0, len(frames_resized), num_frames):
+              frames_to_preprocess = frames_resized[i:i+num_frames]
+              if len(frames_to_preprocess) < num_frames: continue
+
+              with torch.no_grad():
+                z_frames = vision_backbone.preprocess_frames(frames_to_preprocess)
+                z_obs = vision_backbone(z_frames).cpu()
+                z_obs_list.append(z_obs)
+            
+            if len(z_obs_list) == 0: continue
+
+            data = {"z_obs": torch.cat(z_obs_list, dim=0).half(), # saving in float16 to save space
+                    "z_text": z_text.half(), # saving in float16 to save space
+                    "ee_states": torch.from_numpy(ee_states).float(),
+                    "joint_states": torch.from_numpy(joint_states).float(),
+                    "actions": torch.from_numpy(actions).float(),
+                    "success": torch.tensor(is_success, dtype=torch.bool)
+                    }
+          else:
+            data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
+                    "text_instruction": text_instruction,
+                    "ee_states": torch.from_numpy(ee_states).float(),
+                    "joint_states": torch.from_numpy(joint_states).float(),
+                    "actions": torch.from_numpy(actions).float(),
+                    "success": torch.tensor(is_success, dtype=torch.bool)
+                    }
           
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
