@@ -216,3 +216,5 @@ checkpoints
 # To not push data
 data
 processed_data
+# To ignore the results
+results

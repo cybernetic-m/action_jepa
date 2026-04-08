@@ -20,6 +20,11 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 import numpy as np
 import imageio 
+import torch
+from collections import deque
+from model.ActionJEPA import ActionJEPA
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Argument parsing to configure rendering
 # You can run the script with "python main.py --render" to render the simulation.
@@ -85,6 +90,30 @@ env.set_init_state(init_states[init_state_id]) # set the init_state chosen
 print(f"Controller type: {env.env.robots[0].controller.name}")
 print("="*50 + "\n")
 
+# DEFINITION OF THE MODEL
+
+training_run_path = "./results/2026_04_05__00_34"
+config_path = os.path.join(training_run_path, "experiment_config.json")
+model_path = os.path.join(training_run_path, "best_model.pth")
+
+vjepa_path = "checkpoints/facebook/vjepa2-vitg-fpc64-256"
+vjepa_pred_path = "checkpoints/facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar"
+clip_path = "checkpoints/openai/clip-vit-large-patch14"
+
+torch.cuda.empty_cache()
+
+model = ActionJEPA(
+    vjepa_encoder_path=vjepa_path,
+    vjepa_predictor_path=vjepa_pred_path,
+    clip_model_path=clip_path,
+    num_frames=16,
+    use_backbone = True,
+    device=device
+)
+model = model.half()
+model.to(device)
+model.load_state_dict(torch.load(model_path, map_location=device))
+model.eval()
 
 init_action = [0.] * 7 # a start action needed for the first step, to have the first observation from the environment
 frames = [] # list used to store frames for video saving
@@ -107,23 +136,24 @@ frames = [] # list used to store frames for video saving
 
 obs, _, _, _ = env.step(init_action) # apply the first zero action to have the first observation from the environment
 
-for step in range(200):
-    #print(f"\nStep {step}\n")
-    image = obs["agentview_image"] # get the RGB image from the agent's camera
+with torch.no_grad():
+    for step in range(200):
+        #print(f"\nStep {step}\n")
+        image = obs["agentview_image"] # get the RGB image from the agent's camera
 
-    # At the moment a zero action 
-    action = [0]*7
-    #print(f"Action predicted by the VLA: {action}\n")
+        # At the moment a zero action 
+        action = [0]*7
+        #print(f"Action predicted by the VLA: {action}\n")
 
-    obs, reward, done, _ = env.step(action)
-    if RENDER_MODE:
-        env.env.viewer.render()
-    frames.append(np.flipud(obs["agentview_image"])) # np.flipud means Flip Up Down, it is used to flip the image vertically before appending
+        obs, reward, done, _ = env.step(action)
+        if RENDER_MODE:
+            env.env.viewer.render()
+        frames.append(np.flipud(obs["agentview_image"])) # np.flipud means Flip Up Down, it is used to flip the image vertically before appending
 
-# At the end the env is closed
-env.close()
+    # At the end the env is closed
+    env.close()
 
-# Save video if required to a task.mp4 file
-if len(frames) > 0:
-    imageio.mimsave("task.mp4", frames, fps=60)
-    print("Video saved: task.mp4")
+    # Save video if required to a task.mp4 file
+    if len(frames) > 0:
+        imageio.mimsave("task.mp4", frames, fps=60)
+        print("Video saved: task.mp4")
