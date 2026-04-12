@@ -3,6 +3,7 @@ import json
 from training.one_epoch import one_epoch
 import os
 from datetime import datetime
+import pandas as pd
 
 def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, lambda_actor = 1.0, lambda_refiner = 1.0):
     
@@ -15,15 +16,17 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
     best_vloss = 100000000 
     best_epoch = 1
 
-    # ADD METRICS
-    results = {
+    config_dict = {
         'hyperparameters': config,
-        'history': {
-            'train': [],
-            'validation': []
-        },
-        'best_epoch': best_epoch
     }
+
+    json_save_path = os.path.join(training_dir_path, "experiment_config.json")
+    with open(json_save_path, "w") as f:
+        json.dump(config_dict, f, indent=4)
+
+
+    train_history = []
+    val_history = []
 
     for epoch in range(num_epochs):
         print(f"\n" + "="*30)
@@ -41,8 +44,8 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
                                        validation=True
                                        )
         
-        results['history']['train'].append(train_metrics)
-        results['history']['validation'].append(val_metrics)
+        train_history.append(train_metrics)
+        val_history.append(val_metrics)
 
         print("-" * 80)
 
@@ -67,8 +70,15 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
             torch.save(model.state_dict(), model_save_path)
             print(f"Best model! Saving in: {model_save_path}")
 
-        results['best_epoch'] = best_epoch
-        # Saving a json file with the configuration of the trainint
-        json_save_path = os.path.join(training_dir_path, "experiment_config.json")
-        with open(json_save_path, "w") as f:
-            json.dump(results, f, indent=4)
+        df_train = pd.DataFrame(train_history).add_suffix('_train')
+        df_val = pd.DataFrame(val_history).add_suffix('_val')
+
+        df_history = pd.concat([df_train, df_val], axis=1)
+        df_history.index = range(1, len(df_history) + 1)
+        df_history.index.name = 'Epoch'
+
+        csv_save_path = os.path.join(training_dir_path, "metrics.csv")
+        df_history.to_csv(csv_save_path)
+       
+        
+        
