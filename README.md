@@ -6,8 +6,28 @@
 ## 📖 Description
 
 ---
-## 🔧 Instructions
+## 🔧 Instructions (Local)
+
 ### LIBERO environment setup
+In order to 
+### Download LIBERO datasets (optional)
+If you want to retrain the model, you need to download the LIBERO trajectories following these steps:
+
+### V-JEPA 2 
+
+### Download pre-trained models
+
+## 🔧 Instructions (Colab)
+
+### LIBERO environment setup
+In order to 
+### Download LIBERO datasets (optional)
+If you want to retrain the model, you need to download the LIBERO trajectories following these steps:
+
+### V-JEPA 2 
+
+### Download pre-trained models
+
 
 
 ---
