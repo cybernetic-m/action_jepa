@@ -2,33 +2,25 @@
 
 
 <img src="./images/image.png" alt="Description" width="400" height = "300" />
+## 📖 Description
 
-
+---
 ## 🔧 Instructions
 
 
 ---
-
-## 📖 Description
-
----
-
 ## 📽️ Presentation
 
-⚠️**IMPORTANT**⚠️
+CLICK HERE [<img src="https://ssl.gstatic.com/docs/doclist/images/mediatype/icon_1_presentation_x128.png" alt="Google Slides" width= "30" height="30"/>]() 
 
- CLICK HERE [<img src="https://ssl.gstatic.com/docs/doclist/images/mediatype/icon_1_presentation_x128.png" alt="Google Slides" width= "30" height="30"/>]() 
-
+---
 ## 📚 Datasets
 
 ---
-
-
 ## 📊 Experiment and results
 
 
 ---
-
 ## 👤 Author
 
 **Massimo Romano**  
