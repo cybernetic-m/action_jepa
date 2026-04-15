@@ -56,7 +56,6 @@ if __name__ == "__main__":
     # Call the function to download the V-JEPA 2 weights and save them to the local directory "checkpoints"
     weights_path = hf_download_models(
                     hf_model_list=[
-                        "facebook/vjepa2-vith-fpc64-256",
                         "facebook/vjepa2-vitg-fpc64-256",
                         "openai/clip-vit-large-patch14",
                         "facebook/jepa-wms/vjepa2_ac_droid.pth.tar"
@@ -64,9 +63,4 @@ if __name__ == "__main__":
                     ]
                     )
     print(f"\nPretrained model weights downloaded and saved at: {weights_path}\n")
-
-    import torch
-
-    checkpoint_path = "./checkpoints/facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar" 
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
 
