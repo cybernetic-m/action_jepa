@@ -4,7 +4,7 @@ LIBERO/libero/libero/benchmark/__init__.py:
 BEFORE
 init_states = torch.load(init_states_path) 
 AFTER
-init_states = torch.load(init_states_path, weights_only=False)+
+init_states = torch.load(init_states_path, weights_only=False)
 
 Fix for Pytorch 2.6+:
 If you see UnpicklingError: Weights only load failed. This file can still be loaded, to do so you have two options, do those steps only if you trust the source of the checkpoint. 
