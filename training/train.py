@@ -67,7 +67,13 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
             best_vloss = current_vloss
             best_epoch = epoch+1
             model_save_path = os.path.join(training_dir_path, f"best_model.pth")
-            torch.save(model.state_dict(), model_save_path)
+            checkpoint = {
+                'epoch': best_epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'config': config
+            }
+            torch.save(checkpoint, model_save_path)
             print(f"Best model! Saving in: {model_save_path}")
 
         df_train = pd.DataFrame(train_history).add_suffix('_train')
