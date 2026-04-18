@@ -17,7 +17,8 @@ mpl.rcParams['animation.embed_limit'] = 500.0
 def preprocess_libero_dataset(hdf5_path, output_dir, num_frames, vision_backbone = None, language_backbone = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
-   dataset_name = hdf5_path.split('/')[3] # extract the name of the dataset ex: "libero_10", "libero_goal"...
+   parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
+   dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
    os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
