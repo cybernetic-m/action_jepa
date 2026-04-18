@@ -14,7 +14,7 @@ import textwrap
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone, language_backbone, num_frames, use_backbone = False, interpolation = cv2.INTER_LINEAR):
+def preprocess_libero_dataset(hdf5_path, output_dir, num_frames, vision_backbone = None, language_backbone = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
    dataset_name = hdf5_path.split('/')[3] # extract the name of the dataset ex: "libero_10", "libero_goal"...
