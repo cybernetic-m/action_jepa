@@ -1,7 +1,7 @@
 {
-    "num_epochs": 10,
-    "num_frames": 16,
-    "batch_size": 4,
+    "num_epochs": 50,
+    "num_frames": 4,
+    "batch_size": 32,
     "learning_rate": 1e-3,
     "lambda_actor": 1.0,
     "lambda_refiner": 1.0,

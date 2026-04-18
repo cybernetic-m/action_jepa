@@ -18,6 +18,7 @@ class ActionJEPA(nn.Module):
                  language_dim=768,
                  action_dim = 7, 
                  use_backbone = True,
+                 frozen_backbone = True,
                  device="cuda"):
         super(ActionJEPA, self).__init__()
 
@@ -27,10 +28,11 @@ class ActionJEPA(nn.Module):
         self.action_dim = action_dim
         self.num_frames = num_frames
         self.use_backbone = use_backbone
+        self.frozen_backbone = frozen_backbone
         
         if self.use_backbone:
-            self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, device=device)
-            self.language_backbone = CLIPEncoder(model_path=clip_model_path, device=device)
+            self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
+            self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         else:
             self.vision_backbone = None
             self.language_backbone = None
@@ -53,10 +55,11 @@ class ActionJEPA(nn.Module):
     def forward(self, text_input, vision_input):
             
         if self.use_backbone:
-            z_frames = self.vision_backbone.preprocess_frames(vision_input)
-            #print(f"z_frames: {z_frames.shape}")
-            z_obs = self.vision_backbone(z_frames)
-            #print(f"z_obs: {z_obs.shape}")
+            with torch.no_grad():
+                z_frames = self.vision_backbone.preprocess_frames(vision_input)
+                #print(f"z_frames: {z_frames.shape}")
+                z_obs = self.vision_backbone(z_frames)
+                #print(f"z_obs: {z_obs.shape}")
         else: 
             z_obs = vision_input.to(self.device) if torch.is_tensor(vision_input) else vision_input
             #print(f"z_obs: {z_obs.shape}")
@@ -64,10 +67,11 @@ class ActionJEPA(nn.Module):
         B, N, D = z_obs.shape
       
         if self.use_backbone:
-            z_tokens = self.language_backbone.tokenization(text_input)
-            #print(f"z_tokens: {z_tokens}")
-            z_text = self.language_backbone(z_tokens)
-            #print(f"z_text: {z_text.shape}")
+            with torch.no_grad():
+                z_tokens = self.language_backbone.tokenization(text_input)
+                #print(f"z_tokens: {z_tokens}")
+                z_text = self.language_backbone(z_tokens)
+                #print(f"z_text: {z_text.shape}")
         else:
             z_text = text_input.to(self.device) if torch.is_tensor(text_input) else text_input
             #print(f"z_text: {z_text.shape}")
@@ -102,18 +106,20 @@ class ActionJEPA(nn.Module):
         #print(f"a_actor_seq: {actor_action_seq.shape}")
         #actor_action = actor_action_seq[:, -1, :]
 
-        z_pred_tokens, _, _ = self.predictor(z_obs, actor_action_seq)
-        #print(f"z_pred_tokens: {z_pred_tokens.shape}")
-        z_pred_mean = z_pred_tokens.mean(dim=1)
+        with torch.no_grad():
+            z_pred_tokens, _, _ = self.predictor(z_obs, actor_action_seq)
+            #print(f"z_pred_tokens: {z_pred_tokens.shape}")
+            z_pred_final = z_pred_tokens[:, -256:, :].mean(dim=1)
+            #print(f"z_pred_final: {z_pred_final.shape}")
+        #z_pred_mean = z_pred_tokens.mean(dim=1)
         #print(f"z_pred_mean: {z_pred_mean.shape}")
         
         z_obs_final = z_obs[:, -256:, :].mean(dim=1)
         #print(f"z_obs_final: {z_obs_final.shape}")
-        z_pred_final = z_pred_tokens[:, -256:, :].mean(dim=1)
-        #print(f"z_pred_final: {z_pred_final.shape}")
+        
         
         # Creating the input for the refiner as obs, text and prediction
-        refiner_input = torch.cat([z_obs_final, z_text_projected, z_pred_final], dim=-1)
+        refiner_input = torch.cat([z_obs_final, z_text_projected, z_pred_final.detach()], dim=-1)
         #print(f"refiner_input: {refiner_input.shape}")
         refiner_action = self.refiner(refiner_input)
         #print(f"refiner_action: {refiner_action.shape}")

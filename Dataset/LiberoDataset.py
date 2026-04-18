@@ -3,6 +3,11 @@ import glob
 import os
 import numpy as np
 from torch.utils.data import Dataset
+import functools
+
+@functools.lru_cache(maxsize=2)
+def load_cached_demo(path):
+    return torch.load(path, map_location='cpu')
 
 class LiberoDataset(Dataset):
     def __init__(self, data_dir, selected_tasks, window_size=16, stride=1, use_features = False):
@@ -58,7 +63,9 @@ class LiberoDataset(Dataset):
     def __getitem__(self, index):
         data_idx, start_idx = self.window_indices[index] # keep one tuple Ex. (0, 5) (demo 0, start window 5)
         demo_path = self.file_paths[data_idx]  # take the corresponding demo path => './processed_data/libero_10/task_0_demo_0.pt'
-        demo = torch.load(demo_path, map_location='cpu')    # Loading pytorch data
+        
+        #demo = load_cached_demo(demo_path)    # Loading pytorch data
+        demo = torch.load(demo_path, map_location='cpu')
 
         if self.use_features:
             
