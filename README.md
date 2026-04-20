@@ -48,9 +48,9 @@ Then run:
 ```sh
 cp ./action_jepa/fix/__init__.py LIBERO/libero/libero/benchmark/__init__.py
  ```
-
+--------------------------------------
 ### Download LIBERO datasets (optional)
-If you want to retrain the model, you need to download the [**LIBERO dataset**](https://huggingface.co/datasets/yifengzhu-hf/LIBERO-datasets/tree/main):. 
+If you want to retrain the model, you need to download the [**LIBERO dataset**](https://huggingface.co/datasets/yifengzhu-hf/LIBERO-datasets/tree/main):
 
 **[INFO]**
 - _libero_10_ size: 13.7 GB
@@ -58,7 +58,7 @@ If you want to retrain the model, you need to download the [**LIBERO dataset**](
 - _libero_goal_ size: 6.37 GB
 - _libero_object_ size: 7.44 GB
 - _libero_spatial_ size: 6.24 GB
------------------------------
+
 - TOTAL DATASET SIZE: **100 GB**
 You can download it in the old (**OPTION 1**) or if the previous did not work using the modern (**OPTION 2**) way:
 
@@ -87,18 +87,17 @@ If the previous method did not work, you can use the Hugging Face method:
  python benchmark_scripts/download_libero_datasets.py --datasets libero_100
 ```
 
+or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial, libero_object, libero_100, libero_goal```):
+
+```sh
+ cd LIBERO
+ python benchmark_scripts/download_libero_datasets.py --datasets DATASET
+```
+-----------------------------
 ### Download pre-trained models
+You need to download
 
 ## 🔧 Instructions (Colab)
-
-### LIBERO environment setup
-In order to 
-### Download LIBERO datasets (optional)
-If you want to retrain the model, you need to download the LIBERO trajectories following these steps:
-
-### V-JEPA 2 
-
-### Download pre-trained models
 
 
 
@@ -106,9 +105,6 @@ If you want to retrain the model, you need to download the LIBERO trajectories f
 ## 📽️ Presentation
 
 CLICK HERE [<img src="https://ssl.gstatic.com/docs/doclist/images/mediatype/icon_1_presentation_x128.png" alt="Google Slides" width= "30" height="30"/>]() 
-
----
-## 📚 Datasets
 
 ---
 ## 📊 Experiment and results
