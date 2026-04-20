@@ -67,7 +67,7 @@ You can download all the datasets using:
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py
 ```
-or alternatively only a subset (where ```sh DATASET ``` can be ```sh libero_spatial, libero_object, libero_100, libero_goal```:
+or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial, libero_object, libero_100, libero_goal```:
 ```sh
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py --datasets DATASET
