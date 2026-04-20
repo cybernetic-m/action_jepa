@@ -14,7 +14,7 @@ import textwrap
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, num_frames, vision_backbone = None, language_backbone = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
+def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, language_backbone = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
    parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
@@ -114,19 +114,12 @@ def preprocess_libero_dataset(hdf5_path, output_dir, num_frames, vision_backbone
 
           # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
           if use_backbone:
-            z_obs_list = []
-            for i in range(0, len(frames_resized), num_frames):
-              frames_to_preprocess = frames_resized[i:i+num_frames]
-              if len(frames_to_preprocess) < num_frames: continue
-
-              with torch.no_grad():
-                z_frames = vision_backbone.preprocess_frames(frames_to_preprocess)
-                z_obs = vision_backbone(z_frames).cpu()
-                z_obs_list.append(z_obs)
-            
-            if len(z_obs_list) == 0: continue
-
-            data = {"z_obs": torch.cat(z_obs_list, dim=0).half(), # saving in float16 to save space
+            with torch.no_grad():
+              # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
+              z_frames = vision_backbone.preprocess_frames(frames_resized)
+              z_obs = vision_backbone(z_frames).cpu()
+              
+            data = {"z_obs": z_obs.half(), # saving in float16 to save space
                     "z_text": z_text.half(), # saving in float16 to save space
                     "ee_states": torch.from_numpy(ee_states).float(),
                     "joint_states": torch.from_numpy(joint_states).float(),

@@ -49,8 +49,8 @@ class ActionJEPA(nn.Module):
         self.predictor.predictor.is_frame_causal = True
 
         self.language_projector = MLP(input_dim=language_dim, hidden_dims=[1024], output_dim=vision_dim)
-        self.actor = MLP(input_dim=vision_dim*2, hidden_dims=[1024, 512, 256], output_dim=action_dim)
-        self.refiner = MLP(input_dim=vision_dim*3, hidden_dims=[1024, 512, 256], output_dim=action_dim)
+        self.actor = MLP(input_dim=vision_dim*2, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
+        self.refiner = MLP(input_dim=vision_dim*3, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
 
     def forward(self, text_input, vision_input):
             
@@ -64,8 +64,8 @@ class ActionJEPA(nn.Module):
             z_obs = vision_input.to(self.device) if torch.is_tensor(vision_input) else vision_input
             #print(f"z_obs: {z_obs.shape}")
         
-        B, N, D = z_obs.shape
-      
+        B, N, D = z_obs.shape   # B = Batch, N = num of tokens, D = dim of each token
+
         if self.use_backbone:
             with torch.no_grad():
                 z_tokens = self.language_backbone.tokenization(text_input)
@@ -79,8 +79,6 @@ class ActionJEPA(nn.Module):
         # Computing mean values to pooling in the sequence of tokens in 1 token
         #z_obs_mean = z_obs.mean(dim=1)
         #print(f"z_obs_mean: {z_obs_mean.shape}")
-        if z_text.dim() == 4:
-            z_text = z_text.squeeze(1)
         z_text_mean = z_text.mean(dim=1)
         #print(f"z_text_mean: {z_text_mean.shape}")
         
@@ -97,34 +95,31 @@ class ActionJEPA(nn.Module):
             actor_input_t = torch.cat([z_obs_t_mean, z_text_projected], dim=-1)
             #print(f"actor_input: {actor_input_t.shape}")
             actor_action_t = self.actor(actor_input_t)
-            #print(f"a_actor: {actor_action_t.shape}")
+            #print(f"actor_action_t: {actor_action_t.shape}")
             actor_actions_list.append(actor_action_t)
 
-        # Passing the input to the actor
-        
         actor_action_seq = torch.stack(actor_actions_list, dim=1)
-        #print(f"a_actor_seq: {actor_action_seq.shape}")
-        #actor_action = actor_action_seq[:, -1, :]
+        #print(f"actor_action_seq: {actor_action_seq.shape}")
 
         with torch.no_grad():
-            z_pred_tokens, _, _ = self.predictor(z_obs, actor_action_seq)
+            z_pred, _, _ = self.predictor(z_obs, actor_action_seq)
             #print(f"z_pred_tokens: {z_pred_tokens.shape}")
-            z_pred_final = z_pred_tokens[:, -256:, :].mean(dim=1)
-            #print(f"z_pred_final: {z_pred_final.shape}")
-        #z_pred_mean = z_pred_tokens.mean(dim=1)
-        #print(f"z_pred_mean: {z_pred_mean.shape}")
-        
-        z_obs_final = z_obs[:, -256:, :].mean(dim=1)
-        #print(f"z_obs_final: {z_obs_final.shape}")
-        
-        
-        # Creating the input for the refiner as obs, text and prediction
-        refiner_input = torch.cat([z_obs_final, z_text_projected, z_pred_final.detach()], dim=-1)
-        #print(f"refiner_input: {refiner_input.shape}")
-        refiner_action = self.refiner(refiner_input)
-        #print(f"refiner_action: {refiner_action.shape}")
+            
+        z_pred_t = z_pred.view(B, self.T, 256, D)
+        #print(f"z_obs_t: {z_obs_t.shape}")
+        refiner_actions_list = []
+        for t in range(self.T):
+            z_obs_t_mean = z_obs_t[:, t, :, :].mean(dim=1)
+            z_pred_t_mean = z_pred_t[:, t, :, :].mean(dim=1)
+            #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
+            refiner_input_t = torch.cat([z_obs_t_mean, z_text_projected, z_pred_t_mean], dim=-1)
+            #print(f"refiner_input: {refiner_input_t.shape}")
+            refiner_action_t = self.refiner(refiner_input_t)
+            #print(f"refiner_action: {refiner_action_t.shape}")
+            refiner_actions_list.append(refiner_action_t)
+        refiner_action_seq = torch.stack(refiner_actions_list, dim=1)
 
-        return actor_action_seq, refiner_action
+        return actor_action_seq, refiner_action_seq
     
     def print_model_info(self):
         print("MODEL INFO:\n")

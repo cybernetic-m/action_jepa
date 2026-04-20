@@ -31,27 +31,27 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
             # Taking the data from the batch
             frames = batch['vision_input'].to(device)
             text_instruction = batch['text_input'].to(device) if torch.is_tensor(batch['text_input']) else batch['text_input']
-            actor_action_seq_target = batch['actor_action_seq_target'].to(device)
-            refiner_action_target = batch['refiner_action_target'].to(device)
+            action_seq_target = batch['actor_action_seq_target'].to(device)
 
-        
             # Making the predictions
-            actor_action_seq_pred, refiner_action_pred = model(text_instruction, frames)
+            actor_action_seq_pred, refiner_action_seq_pred = model(text_instruction, frames)
 
             # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
-            loss_actor = loss_fn(actor_action_seq_pred, actor_action_seq_target)
-            loss_refiner = loss_fn(refiner_action_pred, refiner_action_target)
+            loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
+            loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
             loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner)
 
             with torch.no_grad():
                 # MAE XYZ
-                mae_xyz = torch.abs(refiner_action_pred[:, :3] - refiner_action_target[:, :3]).mean()
+                mae_xyz = torch.abs(refiner_action_seq_pred[:, :, :3] - action_seq_target[:, :, :3]).mean()
                 
                 # MAE Gripper
-                mae_grip = torch.abs(refiner_action_pred[:, -1] - refiner_action_target[:, -1]).mean()
+                mae_grip = torch.abs(refiner_action_seq_pred[:, :, -1] - action_seq_target[:, :, -1]).mean()
                 
                 # Cosine similarity
-                cosim_ori = F.cosine_similarity(refiner_action_pred[:, 3:6], refiner_action_target[:, 3:6], dim=-1).mean()
+                pred_ori = refiner_action_seq_pred[:, :, 3:6].reshape(-1, 3)
+                target_ori = action_seq_target[:, :, 3:6].reshape(-1, 3)
+                cosim_ori = F.cosine_similarity(pred_ori, target_ori, dim=-1).mean()
                         
             if not validation:
                 # Zeroing the gradient

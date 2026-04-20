@@ -6,13 +6,12 @@ from transformers import CLIPTokenizer, CLIPModel
 
 
 class CLIPEncoder(nn.Module):
-    def __init__(self, model_path , frozen = True, device="cpu"):
+    def __init__(self, model_path, max_length = 77, frozen = True, device="cpu"):
         super(CLIPEncoder, self).__init__()
         
-        # Setting the device (ex. cuda or cpu)
         self.device = device
-
         self.frozen = frozen
+        self.max_length = max_length
 
         # Check if the model was downloaded
         if os.path.exists(model_path): 
@@ -34,7 +33,7 @@ class CLIPEncoder(nn.Module):
             self.language_encoder.train()
 
     def tokenization(self, text):
-        text_tokens = self.tokenizer(text, padding='max_length', truncation=True, max_length = 77, return_tensors="pt").to(self.device)
+        text_tokens = self.tokenizer(text, padding='max_length', truncation=True, max_length = self.max_length, return_tensors="pt").to(self.device)
         return text_tokens
         
     def forward(self, text_tokens):
