@@ -34,9 +34,11 @@ In the original LIBERO env I have changed the 164 line of the file:
 LIBERO/libero/libero/benchmark/__init__.py:
 
 BEFORE
+
 _init_states = torch.load(init_states_path)_ 
 
 AFTER
+
 _init_states = torch.load(init_states_path, weights_only=False)_
 
 To solve _UnpicklingError: Weights only load failed_ error.
