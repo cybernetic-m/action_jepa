@@ -33,11 +33,11 @@ Firstly you need to install all the dependencies needed to run inference with th
 In the original LIBERO env I have changed the 164 line of the file:
 LIBERO/libero/libero/benchmark/__init__.py:
 
-BEFORE
+- BEFORE
 
 _init_states = torch.load(init_states_path)_ 
 
-AFTER
+- AFTER
 
 _init_states = torch.load(init_states_path, weights_only=False)_
 
