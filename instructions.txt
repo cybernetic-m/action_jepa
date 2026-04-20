@@ -1,5 +1,0 @@
-To download 
-
-To download episodes: 
-
-python download_data.py --num_episodes 2500 2> download_errors.log
