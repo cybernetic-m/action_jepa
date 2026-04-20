@@ -57,7 +57,7 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
               f"Actor: {val_metrics['loss_actor']:.4f} | "
               f"Refiner: {val_metrics['loss_refiner']:.4f}")
         
-        print(f"METRICS  (Validation)  | XYZ Err: {val_metrics['mae_xyz']:.2f} | "
+        print(f"METRICS  (Validation)  | XYZ Err: {val_metrics['mae_xyz']:.2f} | Gripper Err: {val_metrics['mae_gripper']:.2f} | "
               f"Cosine Sim Orientation: {val_metrics['cosim_ori']:.3f}")
         
         print("-" * 80) 
