@@ -21,7 +21,6 @@ Firstly you need to install all the dependencies needed to run inference with th
  cd LIBERO
  pip install -r requirements.txt
  pip install -e .
- cd ..
  ```
 3. **Clone and install requirements of the JEPA World Models repository:**
 ```sh
@@ -67,14 +66,14 @@ You can download all the datasets using:
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py
 ```
-or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial, libero_object, libero_100, libero_goal```:
+or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial, libero_object, libero_100, libero_goal```):
 ```sh
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py --datasets DATASET
 ```
 
-
 2. **OPTION 2 (Hugging Face)**
+If the previous method did not work, you can use the Hugging Face method:
 ```sh
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py --use-huggingface
