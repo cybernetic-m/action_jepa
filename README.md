@@ -63,11 +63,14 @@ If you want to retrain the model, you need to download the [**LIBERO dataset**](
 You can download it in the old (**OPTION 1**) or if the previous did not work using the modern (**OPTION 2**) way:
 
 1. **OPTION 1**
+   
 You can download all the datasets using:
+
 ```sh
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py
 ```
+
 or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial, libero_object, libero_100, libero_goal```):
 ```sh
  cd LIBERO
@@ -75,7 +78,9 @@ or alternatively only a subset (where ``` DATASET ``` can be ``` libero_spatial,
 ```
 
 2. **OPTION 2 (Hugging Face)**
+
 If the previous method did not work, you can use the Hugging Face method:
+
 ```sh
  cd LIBERO
  python benchmark_scripts/download_libero_datasets.py --use-huggingface
