@@ -29,12 +29,13 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
         for batch in pbar:
             
             # Taking the data from the batch
-            frames = batch['vision_input'].to(device)
-            text_instruction = batch['text_input'].to(device) if torch.is_tensor(batch['text_input']) else batch['text_input']
+            vision_input = batch['vision_input'].to(device)
+            text_input = batch['text_input'].to(device) if torch.is_tensor(batch['text_input']) else batch['text_input']
+            joint_input = batch['joint_input'].to(device)
             action_seq_target = batch['action_seq_target'].to(device)
 
             # Making the predictions
-            actor_action_seq_pred, refiner_action_seq_pred = model(text_instruction, frames)
+            actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
 
             # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
             loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)

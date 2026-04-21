@@ -16,7 +16,9 @@ class ActionJEPA(nn.Module):
                  num_frames=16,
                  vision_dim = 1408,
                  language_dim=768,
-                 action_dim = 7, 
+                 action_dim = 7,
+                 joint_dim = 7, 
+                 joint_feat_dim = 256,
                  use_backbone = True,
                  frozen_backbone = True,
                  device="cuda"):
@@ -29,6 +31,8 @@ class ActionJEPA(nn.Module):
         self.num_frames = num_frames
         self.use_backbone = use_backbone
         self.frozen_backbone = frozen_backbone
+        self.joint_dim = joint_dim
+        self.joint_feat_dim = joint_feat_dim
         
         if self.use_backbone:
             self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
@@ -48,11 +52,13 @@ class ActionJEPA(nn.Module):
         self.predictor.predictor.attn_mask = mask.to(device)
         self.predictor.predictor.is_frame_causal = True
 
-        self.language_projector = MLP(input_dim=language_dim, hidden_dims=[1024], output_dim=vision_dim)
-        self.actor = MLP(input_dim=vision_dim*2, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
-        self.refiner = MLP(input_dim=vision_dim*3, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
+        self.joint_projector = MLP(input_dim=self.joint_dim, hidden_dims=[128], output_dim=self.joint_feat_dim)
+        self.language_projector = MLP(input_dim=self.language_dim, hidden_dims=[1024], output_dim=vision_dim)
 
-    def forward(self, text_input, vision_input):
+        self.actor = MLP(input_dim=vision_dim*2 + self.joint_feat_dim, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
+        self.refiner = MLP(input_dim=vision_dim*3 + self.joint_feat_dim, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim)
+
+    def forward(self, text_input, vision_input, joint_input):
             
         if self.use_backbone:
             with torch.no_grad():
@@ -86,13 +92,16 @@ class ActionJEPA(nn.Module):
         z_text_projected = self.language_projector(z_text_mean)
         #print(f"z_text_projected: {z_text_projected.shape}")
 
+        z_joint = self.joint_projector(joint_input)
+
         z_obs_t = z_obs.view(B, self.T, 256, D)
         #print(f"z_obs_t: {z_obs_t.shape}")
         actor_actions_list = []
         for t in range(self.T):
             z_obs_t_mean = z_obs_t[:, t, :, :].mean(dim=1)
+            z_joint_t = z_joint[:,t,:]
             #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
-            actor_input_t = torch.cat([z_obs_t_mean, z_text_projected], dim=-1)
+            actor_input_t = torch.cat([z_obs_t_mean, z_text_projected, z_joint_t], dim=-1)
             #print(f"actor_input: {actor_input_t.shape}")
             actor_action_t = self.actor(actor_input_t)
             #print(f"actor_action_t: {actor_action_t.shape}")
@@ -111,8 +120,10 @@ class ActionJEPA(nn.Module):
         for t in range(self.T):
             z_obs_t_mean = z_obs_t[:, t, :, :].mean(dim=1)
             z_pred_t_mean = z_pred_t[:, t, :, :].mean(dim=1)
+            z_joint_t = z_joint[:, t, :]
+
             #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
-            refiner_input_t = torch.cat([z_obs_t_mean, z_text_projected, z_pred_t_mean], dim=-1)
+            refiner_input_t = torch.cat([z_obs_t_mean, z_text_projected, z_pred_t_mean, z_joint_t], dim=-1)
             #print(f"refiner_input: {refiner_input_t.shape}")
             refiner_action_t = self.refiner(refiner_input_t)
             #print(f"refiner_action: {refiner_action_t.shape}")

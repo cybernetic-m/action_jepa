@@ -72,19 +72,25 @@ class LiberoDataset(Dataset):
         z_text = demo['z_text'].float()
         z_text = z_text.squeeze(0)
 
-        # All the actions
+        
+
+        # All the actions and joints states
         actions = demo['actions'].float()
+        joint_states = demo['joint_states'].float()
         action_seq_target = []
+        joint_input = []
 
         for i in range (self.T_window):
-            action_idx = ((start_idx+i)*2) + 1
-            action_idx = min(action_idx, len(actions)-1)
-            action_seq_target.append(actions[action_idx])
+            idx = min(((start_idx + i) * 2) + 1, len(actions) - 1)
+            joint_input.append(joint_states[idx])
+            action_seq_target.append(actions[idx])
 
         action_seq_target = torch.stack(action_seq_target)
+        joint_input = torch.stack(joint_input)
         
         return {'vision_input': z_obs_window,
                 'text_input': z_text,
+                'joint_input': joint_input,
                 'action_seq_target': action_seq_target,
                 } 
         '''
