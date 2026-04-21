@@ -206,7 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-task.mp4
+
 *.gif
 
 # To not push conda virtual environments to git
@@ -219,3 +219,5 @@ processed_data
 # To ignore the results
 results
 hf_token.txt
+
+*.mp4

@@ -102,7 +102,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
 
           # Flipping all the frames vertically because the original ones are flipped
           frames_flipped = np.flip(frames[::], axis=1)
-          
+
           # Resize the frames from original size 128x128 to 256x256 size
           new_size = (256, 256)
           frames_resized = [] 
@@ -145,6 +145,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
    # Saving the correspondance map in json file
    with open(os.path.join(output_dir, dataset_name, 'task_info.json'), 'w') as f:
     json.dump(task_info, f)
+   
 
 def demo_animator(demo_pt_path):
   
