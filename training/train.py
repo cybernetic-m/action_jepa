@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 import pandas as pd
 
-def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, lambda_actor = 1.0, lambda_refiner = 1.0):
+def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, scaler, lambda_actor = 1.0, lambda_refiner = 1.0):
     
     # time stamp for creating a directory of the type ./results/2026_04_16__15_45
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M")
@@ -45,7 +45,7 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
             optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_epochs]
         )
     current_lr = optimizer.param_groups[0]['lr']
-
+    
     for epoch in range(num_epochs):
         
         print(f"\n" + "="*30)
@@ -53,16 +53,28 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
         print("="*30)
 
         # One epoch of training 
-        train_metrics = one_epoch(model, train_loader, optimizer, loss_fn, 
-                                       device, lambda_actor, lambda_refiner
-                                       )
+        train_metrics = one_epoch(model=model, 
+                                  dataloader=train_loader, 
+                                  optimizer=optimizer, 
+                                  loss_fn=loss_fn, 
+                                  device = device,
+                                  scaler=scaler,
+                                  lambda_actor=lambda_actor, 
+                                  lambda_refiner = lambda_refiner
+                                  )
         train_metrics['lr'] = current_lr    # saving also the current value of LR
 
         # One epoch of validation 
-        val_metrics = one_epoch(model, val_loader, optimizer, loss_fn, 
-                                       device, lambda_actor, lambda_refiner, 
-                                       validation=True
-                                       )
+        val_metrics = one_epoch(model=model, 
+                                dataloader=val_loader, 
+                                optimizer=optimizer, 
+                                loss_fn=loss_fn, 
+                                device = device,
+                                scaler=scaler,
+                                lambda_actor=lambda_actor, 
+                                lambda_refiner = lambda_refiner,
+                                validation=True
+                                )
         
         train_history.append(train_metrics)
         val_history.append(val_metrics)

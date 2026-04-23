@@ -1,8 +1,9 @@
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+from torch.amp import autocast
 
-def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0, lambda_refiner = 1.0, validation = False):
+def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_actor = 1.0, lambda_refiner = 1.0, validation = False):
     
     # Set the model in validation or training mode
     # Compute the gradient only if we are in training mode, 
@@ -34,13 +35,14 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
             joint_input = batch['joint_input'].to(device)
             action_seq_target = batch['action_seq_target'].to(device)
 
-            # Making the predictions
-            actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
+            with autocast(device_type='cuda', enabled=(device == 'cuda')):
+                # Making the predictions
+                actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
 
-            # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
-            loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
-            loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
-            loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner)
+                # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
+                loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
+                loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
+                loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner)
 
             with torch.no_grad():
                 # MAE XYZ
@@ -55,17 +57,26 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
                 cosim_ori = F.cosine_similarity(pred_ori, target_ori, dim=-1).mean()
                         
             if not validation:
-                # Zeroing the gradient
+                
                 optimizer.zero_grad()
+                
+                if scaler is not None:
+                    
+                    scaler.scale(loss).backward()
+                    
+                    scaler.unscale_(optimizer)
+                    if model.policy == 'transformer':
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
+                    scaler.step(optimizer)
+                    scaler.update() 
 
-                # Compute the backward pass (gradient values)
-                loss.backward()
-
-                if model.policy == "transformer":
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-
-                # Update weights
-                optimizer.step()
+                else:
+                    
+                    loss.backward()
+                    if model.policy == 'transformer':
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
             
             # Incrementing the loss of the epoch
             epoch_loss += loss.item()
