@@ -31,6 +31,7 @@ class TransformerActionJEPA(nn.Module):
         self.frozen_backbone = frozen_backbone
         self.joint_dim = joint_dim
         self.embed_dim = embed_dim
+        self.policy = 'transformer'
         
         if self.use_backbone:
             self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
@@ -152,6 +153,12 @@ class TransformerActionJEPA(nn.Module):
         if self.use_backbone:
             print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}\n{self.vision_backbone}")
             print(f"LANGUAGE BACKBONE {self.language_backbone.__class__.__name__}\n{self.language_backbone}")
-        print(f"PREDICTOR NETWORK:\n{self.predictor}")
-        print(f"ACTOR NETWORK:\n{self.actor}")
-        print(f"REFINER NETWORK:\n{self.refiner}")
+        print(f"LEARNABLE ACTION TOKEN:\n{self.action_token.shape}")
+        print(f"PREDICTOR LAYERS:\n{self.predictor.__class__.__name__}\n{self.predictor}")
+        print(f"LANGUAGE PROJECTOR LAYERS:\n{self.language_proj}")
+        print(f"VISION PROJECTOR LAYERS:\n{self.vision_proj}")
+        print(f"JOINT PROJECTOR LAYERS:\n{self.joint_proj}")
+        print(f"ACTOR LAYERS:\n{self.actor}")
+        print(f"REFINER LAYERS:\n{self.refiner}")
+        print(f"ACTOR HEAD LAYERS:\n{self.actor_head}")
+        print(f"REFINER HEAD LAYERS:\n{self.refiner_head}")

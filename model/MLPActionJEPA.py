@@ -8,7 +8,7 @@ from model.modules.VJEPAEncoder import VJEPAEncoder
 from model.modules.MLP import MLP
 from src.models.utils.modules import build_action_block_causal_attention_mask
 
-class ActionJEPA(nn.Module):
+class MLPActionJEPA(nn.Module):
     def __init__(self, 
                  vjepa_encoder_path, 
                  vjepa_predictor_path,
@@ -22,7 +22,7 @@ class ActionJEPA(nn.Module):
                  use_backbone = True,
                  frozen_backbone = True,
                  device="cuda"):
-        super(ActionJEPA, self).__init__()
+        super(MLPActionJEPA, self).__init__()
 
         self.device = device
         self.vision_dim = vision_dim
@@ -33,6 +33,7 @@ class ActionJEPA(nn.Module):
         self.frozen_backbone = frozen_backbone
         self.joint_dim = joint_dim
         self.joint_feat_dim = joint_feat_dim
+        self.policy = 'mlp'
         
         if self.use_backbone:
             self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)

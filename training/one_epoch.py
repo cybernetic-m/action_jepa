@@ -61,6 +61,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, lambda_actor = 1.0,
                 # Compute the backward pass (gradient values)
                 loss.backward()
 
+                if model.policy == "transformer":
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
                 # Update weights
                 optimizer.step()
             
