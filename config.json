@@ -1,6 +1,6 @@
 {
     "num_epochs": 50,
-    "num_frames": 4,
+    "num_frames": 8,
     "batch_size": 16,
     "max_length": 77,
     "preprocessing_with_backbone": true,
