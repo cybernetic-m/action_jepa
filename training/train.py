@@ -124,7 +124,7 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
         csv_save_path = os.path.join(training_dir_path, "metrics.csv")
         df_history.to_csv(csv_save_path)
 
-        return training_dir_path
+    return training_dir_path
        
         
         

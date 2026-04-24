@@ -1,5 +1,5 @@
 {
-    "num_epochs": 50,
+    "num_epochs": 100,
     "num_frames": 8,
     "batch_size": 16,
     "max_length": 77,
