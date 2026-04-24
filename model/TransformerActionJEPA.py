@@ -60,9 +60,9 @@ class TransformerActionJEPA(nn.Module):
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
+                nhead=16, 
                 dim_feedforward=2048, 
-                dropout=0.1, 
+                dropout=0.3, 
                 batch_first = True),
             num_layers = 3
                 )
@@ -70,9 +70,9 @@ class TransformerActionJEPA(nn.Module):
         self.refiner = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
+                nhead=16, 
                 dim_feedforward=2048, 
-                dropout=0.1, 
+                dropout=0.3, 
                 batch_first = True),
             num_layers = 3
                 )
