@@ -3,71 +3,89 @@
 # Title: ""
 # Data: 2026
 
-import argparse
-from utils.utils import preprocess_libero_dataset
-from model.modules.CLIPEncoder import CLIPEncoder
-from model.modules.VJEPAEncoder import VJEPAEncoder
+import sys
+import os
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+root_path = os.path.abspath(os.path.join(script_dir, "../"))
+
+# Aggiunge la root e LIBERO al path
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+from utils import preprocess_libero_dataset
 import torch
 import json
+import os
+import cv2
+from model.TransformerActionJEPA import TransformerActionJEPA
 
 if __name__ == "__main__":
-
-    datasets_dir = "./LIBERO/libero/datasets"
-    processed_data_dir ='./processed_data'
-    parser = argparse.ArgumentParser(description="Script to preprocess data")
-
-    parser.add_argument('--dataset', type=str, default='all', help='Select the dataset to preprocess ["libero_goal", "libero_spatial", "libero_object", "libero_90", "libero_10"] (if you do not write anything "all" will be applied)')
-    parser.add_argument('--use_backbone', action='store_true', help='Use V-JEPA 2 and CLIP backbones to preprocess data for faster training')
-
-    args = parser.parse_args()
-    print(f"Preprocessing with backbone: {args.use_backbone}\nDataset: {args.dataset}")
-
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-
+        
     if torch.cuda.is_available():
         device = "cuda"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
         device = "cpu"
+
+    datasets_dir = "../LIBERO/libero/datasets"
+    processed_data_dir ='../processed_data'
     
-    if args.dataset == "all":
+    with open('../config.json', 'r') as f:
+        config = json.load(f)
+
+    PREPROCESSING_WITH_BACKBONE = config['preprocessing_with_backbone'] 
+    NUM_FRAMES = config['num_frames']
+    DATASET_TYPE = config['dataset_type']
+    INTERPOLATION_TYPE = config['interpolation_type']
+
+    interpolation_dict= {
+    "nearest": cv2.INTER_NEAREST,
+    "linear": cv2.INTER_LINEAR,
+    "area": cv2.INTER_AREA,
+    "cubic": cv2.INTER_CUBIC
+}
+
+    # the get method return the value corresponding to the key INTERPOLATION TYPE, otherwise it return INTER CUBIC method
+    interpolation = interpolation_dict.get(INTERPOLATION_TYPE, cv2.INTER_CUBIC)
+    
+    print(f"Preprocessing with backbone: {PREPROCESSING_WITH_BACKBONE}\nDataset: {DATASET_TYPE}\nInterpolation: {INTERPOLATION_TYPE}")
+
+    if DATASET_TYPE == "all":
         selected_tasks = ["libero_10", "libero_90", "libero_spatial", "libero_goal", "libero_object"]
     else:
-        selected_tasks = [args.dataset]
+        selected_tasks = [DATASET_TYPE]
     
     libero_paths = [f"{datasets_dir}/{task}/*.hdf5" for task in selected_tasks]
 
-    if args.use_backbone:
-        # Path for the VJEPA Vision Encoder
-        vjepa_path = "checkpoints/facebook/vjepa2-vitg-fpc64-256"
+    if PREPROCESSING_WITH_BACKBONE:
+        checkpoints_path = "../checkpoints"
+        # Path for all the models
+        vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
+        vjepa_pred_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
+        clip_path = os.path.join(checkpoints_path,"openai/clip-vit-large-patch14")
 
-        vision_backbone = VJEPAEncoder(
-            model_path=vjepa_path,
-            frozen=True,
+        model = TransformerActionJEPA(
+            vjepa_encoder_path=vjepa_path,
+            vjepa_predictor_path=vjepa_pred_path,
+            clip_model_path=clip_path,
+            num_frames=NUM_FRAMES,
+            use_backbone = True,
             device=device
         ).to(device)
 
-        # Path for the CLIP Language Encoder 
-        clip_path = "checkpoints/openai/clip-vit-large-patch14"
-
-        language_backbone = CLIPEncoder(
-            model_path=clip_path,
-            max_length = config['max_length'],
-            frozen=True,
-            device=device
-        ).to(device)
     else:
         vision_backbone = None
         language_backbone = None
         
     for path in libero_paths:
-        preprocess_libero_dataset(hdf5_path=path,
-                                output_dir=processed_data_dir,
-                                vision_backbone = vision_backbone, 
-                                language_backbone = language_backbone, 
-                                use_backbone = args.use_backbone
+        preprocess_libero_dataset(
+                                hdf5_path=path,
+                                output_dir=processed_data_dir, 
+                                use_backbone = PREPROCESSING_WITH_BACKBONE,
+                                model=model,
+                                interpolation=interpolation
                                 )
 
 

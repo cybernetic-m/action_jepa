@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 class LiberoDataset(Dataset):
-    def __init__(self, data_dir, selected_tasks, num_frames=16, stride=1, use_features = False):
+    def __init__(self, data_dir, selected_tasks, num_frames=4, use_features = False):
         """
         Args:
             data_dir (str): './processed_data', the generic path of all the data for all the tasks
@@ -19,8 +19,7 @@ class LiberoDataset(Dataset):
 
         self.file_paths = []   # a list of all the file paths (Ex. ./processed_data/libero_10/task_0_demo_0.pt)
         self.T_window = num_frames // 2
-        #self.use_features = use_features
-        self.stride = min(stride, self.T_window)
+        #self.use_features = use_feature
         # Each step is divided in 16x16 patches, then each instant between frames are 256 tokens
         self.num_patches = 256
         
@@ -36,9 +35,9 @@ class LiberoDataset(Dataset):
         for data_idx, path in enumerate(self.file_paths):
             data = torch.load(path, map_location='cpu', weights_only=True)
             N_tokens = data['z_obs'].shape[1] #if use_features else data['frames'].shape[0] # number of steps in that demo or number of tubelets if feature extracted
-            T_demo = N_tokens // 256
+            T_demo = N_tokens // self.num_patches
             #if self.use_features:
-            for start_idx in range(0, T_demo - self.T_window +1 , self.stride):
+            for start_idx in range(0, T_demo - self.T_window +1):
                 self.window_indices.append((data_idx,start_idx))
             #else:
                 #if self.T >= self.window_size:
@@ -58,8 +57,7 @@ class LiberoDataset(Dataset):
         #if self.use_features:
 
         # Extracting the entire z_obs vision features tokens
-        z_obs = demo['z_obs'].float()
-        z_obs = z_obs.squeeze(0)
+        z_obs = demo['z_obs'].float().squeeze(0)
 
         # Computing the token of start and the token of end
         token_start_pos = start_idx*self.num_patches
@@ -69,24 +67,17 @@ class LiberoDataset(Dataset):
         z_obs_window = z_obs[token_start_pos:token_end_pos]
         
         # Extracting the z_text text features
-        z_text = demo['z_text'].float()
-        z_text = z_text.squeeze(0)
-
-        
+        z_text = demo['z_text'].float().squeeze(0)
 
         # All the actions and joints states
         actions = demo['actions'].float()
         joint_states = demo['joint_states'].float()
-        action_seq_target = []
-        joint_input = []
+        
+        end_idx = start_idx+self.T_window
 
-        for i in range (self.T_window):
-            idx = min(((start_idx + i) * 2) + 1, len(actions) - 1)
-            joint_input.append(joint_states[idx])
-            action_seq_target.append(actions[idx])
+        joint_input = joint_states[start_idx:end_idx]
+        action_seq_target = actions[start_idx:end_idx]
 
-        action_seq_target = torch.stack(action_seq_target)
-        joint_input = torch.stack(joint_input)
         
         return {'vision_input': z_obs_window,
                 'text_input': z_text,

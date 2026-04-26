@@ -14,12 +14,13 @@ import textwrap
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, language_backbone = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
+def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
    parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
    dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
-   os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
+   dir_name = f"{dataset_name}_num_frames_{model.num_frames}"
+   os.makedirs(os.path.join(output_dir, dir_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
@@ -36,8 +37,8 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
 
    # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
    if use_backbone:
-    device = vision_backbone.device
-    print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
+    device = model.vision_backbone.device
+    print(f"Preprocessing using feature extraction with {model.vision_backbone.__class__.__name__} vision backbone and {model.language_backbone.__class__.__name__} language backbone on device: {device}")
 
    # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
    for task_idx, file_path in enumerate(files):
@@ -54,8 +55,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
         # Preprocessing using the CLIP ENCODER backbone if needed
         if use_backbone:
           with torch.no_grad():
-            z_tokens = language_backbone.tokenization(text_instruction)
-            z_text = language_backbone(z_tokens).cpu()
+            z_text = model.preprocess_text(text_instruction).cpu()
         
         for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
 
@@ -66,14 +66,6 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
           dones = demo['dones'][:]
           is_success = (dones[-1] == 1) # True if there is 1 at last step
 
-          # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
-          # where D means delta values of translations (first three), axis angle orientation (second three)
-          # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
-          actions = demo['actions'][:]
-
-          # We will save also the joint states
-          joint_states = demo['obs']['joint_states'][:]
-          
           # If there is not a success we increment the counter of non success and skip this demo
           # otherwise we increment the success counter and take this demo
           if not is_success:
@@ -89,47 +81,86 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
           T, H, W, C = frames.shape
           
           # Taking the corresponding end effector cartesian position, orientation and gripper states
-          ee_pos = demo['obs']['ee_pos'][:] # (ee_x, ee_y, ee_z) three cartesian values of the end effector position
-          ee_ori = demo['obs']['ee_ori'][:] # (r_x, r_y, r_z) three values in AXIS-ANGLE representation of the end effector orientation
+          #ee_pos = demo['obs']['ee_pos'][:] # (ee_x, ee_y, ee_z) three cartesian values of the end effector position
+          #ee_ori = demo['obs']['ee_ori'][:] # (r_x, r_y, r_z) three values in AXIS-ANGLE representation of the end effector orientation
           
           # For the gripper we have originally two values (ee_g_left, ee_g_right), equal in module but different in sign: ex. (0.0360, -0.0356)
           # that represent the opening of the left and right part of the gripper with respect to the center
           # I take the difference and divide by 2: (ee_g_left - ee_g_right) / 2 => (0.0360 - (-0.0356))/2 = 0.0715/2 = 0.0358
-          ee_gripper_two_val = demo['obs']['gripper_states'][:] 
-          ee_gripper = (ee_gripper_two_val[:,0] - ee_gripper_two_val[:,-1])/2
-          ee_gripper = ee_gripper.reshape(-1, 1)
-          ee_states = np.concatenate([ee_pos, ee_ori, ee_gripper], axis=1)
+          #ee_gripper_two_val = demo['obs']['gripper_states'][:] 
+          #ee_gripper = (ee_gripper_two_val[:,0] - ee_gripper_two_val[:,-1])/2
+          #ee_gripper = ee_gripper.reshape(-1, 1)
+          #ee_states = np.concatenate([ee_pos, ee_ori, ee_gripper], axis=1)
 
           # Flipping all the frames vertically because the original ones are flipped
           frames_flipped = np.flip(frames[::], axis=1)
+
+          # From a sequence of frames as (1,2,3,4) I want to create another sequence that contain each pair (1,2,2,3,3,4)
+          # because V JEPA takes (1,2) - (2,3) - (3,4) to extract z_obs features!
+          frames_repeated = np.repeat(frames_flipped, 2, axis=0) # this create (1,1,2,2,3,3,4,4)
+          frames_repeated = frames_repeated[1:-1] # eliminate first and last frame (1,2,2,3,3,4)
+
+          # Copying for num_frames the first frame (needed for inference)
+          frames_firstRepeated = np.repeat(frames_repeated[0:1], model.num_frames, axis = 0)
+          frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
 
           # Resize the frames from original size 128x128 to 256x256 size
           new_size = (256, 256)
           frames_resized = [] 
 
-          for t in range(len(frames_flipped)):
-              frame = frames_flipped[t]
+          for t in range(len(frames_padded)):
+              frame = frames_padded[t]
               resized_frame = cv2.resize(frame, new_size, interpolation=interpolation)
               frames_resized.append(resized_frame)
+
+          # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
+          # where D means delta values of translations (first three), axis angle orientation (second three)
+          # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
+          actions = demo['actions'][:]
+
+          # We need to put zero actions for the num_frames repeated first frame!
+          action_padding = np.zeros((model.num_frames // 2, model.action_dim))
+          actions_padded = np.concatenate([action_padding, actions], axis=0)
+
+          # We will save also the joint states
+          joint_states = demo['obs']['joint_states'][:]
+          
+          # We do the same padding for joints
+          joint_padding = np.repeat(joint_states[0:1], model.num_frames // 2, axis = 0)
+          joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
 
           # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
           if use_backbone:
             with torch.no_grad():
               # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
-              z_frames = vision_backbone.preprocess_frames(frames_resized)
-              z_obs = vision_backbone(z_frames).cpu()
+              z_obs = model.preprocess_frames(frames_resized).cpu()
+
+            # Cutting actions and states that exceed the dimensione of z_obs steps
+            steps = z_obs.shape[1] // 256  
+
+            # Tronchiamo azioni e giunti per farli combaciare al 100%
+            if actions_padded.shape[0] > steps:
+                actions_padded = actions_padded[:steps]
+                joints_states_padded = joints_states_padded[:steps]
+            
+            #print(f"frames: {frames.shape}")
+            #print(f"frames repeated: {frames_repeated.shape}")
+            #print(f"frames padded: {frames_padded.shape}")
+            #print(f"z_obs: {z_obs.shape}")
+            #print(f"joint_states: {joints_states_padded.shape}")
+            #print(f"actions: {actions_padded.shape}")
               
             data = {"z_obs": z_obs.half(), # saving in float16 to save space
                     "z_text": z_text.half(), # saving in float16 to save space
-                    "ee_states": torch.from_numpy(ee_states).float(),
-                    "joint_states": torch.from_numpy(joint_states).float(),
-                    "actions": torch.from_numpy(actions).float(),
+                    #"ee_states": torch.from_numpy(ee_states).float(),
+                    "joint_states": torch.from_numpy(joints_states_padded).float(),
+                    "actions": torch.from_numpy(actions_padded).float(),
                     "success": torch.tensor(is_success, dtype=torch.bool)
                     }
           else:
             data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
                     "text_instruction": text_instruction,
-                    "ee_states": torch.from_numpy(ee_states).float(),
+                    #"ee_states": torch.from_numpy(ee_states).float(),
                     "joint_states": torch.from_numpy(joint_states).float(),
                     "actions": torch.from_numpy(actions).float(),
                     "success": torch.tensor(is_success, dtype=torch.bool)
@@ -137,7 +168,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, vision_backbone = None, lan
           
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
-          torch.save(data, os.path.join(output_dir, dataset_name, save_name))
+          torch.save(data, os.path.join(output_dir, dir_name, save_name))
    
    task_info['success_demo'] = count_success
    task_info['non_success_demo'] = count_nonsuccess

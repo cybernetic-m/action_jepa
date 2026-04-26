@@ -60,9 +60,9 @@ class TransformerActionJEPA(nn.Module):
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=16, 
+                nhead=8, 
                 dim_feedforward=2048, 
-                dropout=0.3, 
+                dropout=0.1, 
                 batch_first = True),
             num_layers = 3
                 )
@@ -70,9 +70,9 @@ class TransformerActionJEPA(nn.Module):
         self.refiner = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=16, 
+                nhead=8, 
                 dim_feedforward=2048, 
-                dropout=0.3, 
+                dropout=0.1, 
                 batch_first = True),
             num_layers = 3
                 )
@@ -80,33 +80,31 @@ class TransformerActionJEPA(nn.Module):
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[256, 128], output_dim=action_dim)
         self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[256, 128], output_dim=action_dim)
 
-    def forward(self, text_input, vision_input, joint_input):
+    def preprocess_frames(self, vision_input):
+        z_frames = self.vision_backbone.preprocess_frames(vision_input)
+        z_obs = self.vision_backbone(z_frames)
+        return z_obs
+    
+    def preprocess_text(self, language_input):
+        z_tokens = self.language_backbone.tokenization(language_input)
+        z_text = self.language_backbone(z_tokens)
+        return z_text
+
+    def forward(self, language_input, vision_input): #, joint_input):
             
         if self.use_backbone:
             with torch.no_grad():
-                z_frames = self.vision_backbone.preprocess_frames(vision_input)
-                #print(f"z_frames: {z_frames.shape}")
-                z_obs = self.vision_backbone(z_frames)
-                #print(f"z_obs: {z_obs.shape}")
+                z_obs = self.preprocess_frames(vision_input)
+                z_text = self.preprocess_text(language_input)
         else: 
-            z_obs = vision_input.to(self.device) if torch.is_tensor(vision_input) else vision_input
-            #print(f"z_obs: {z_obs.shape}")
+            z_obs = vision_input.to(self.device) #if torch.is_tensor(vision_input) else vision_input
+            z_text = language_input.to(self.device) #if torch.is_tensor(language_input) else language_input
         
         B, N, D = z_obs.shape   # B = Batch, N = num of tokens, D = dim of each token
 
-        if self.use_backbone:
-            with torch.no_grad():
-                z_tokens = self.language_backbone.tokenization(text_input)
-                #print(f"z_tokens: {z_tokens}")
-                z_text = self.language_backbone(z_tokens)
-                #print(f"z_text: {z_text.shape}")
-        else:
-            z_text = text_input.to(self.device) if torch.is_tensor(text_input) else text_input
-            #print(f"z_text: {z_text.shape}")
-
         z_obs_proj = self.vision_proj(z_obs)
         z_text_proj = self.language_proj(z_text)
-        z_joint_proj = self.joint_proj(joint_input)
+        #z_joint_proj = self.joint_proj(joint_input)
 
         action_token_batch = self.action_token.expand(B, -1, -1)
 
@@ -115,7 +113,8 @@ class TransformerActionJEPA(nn.Module):
         actor_actions_list = []
         for t in range(self.T):
             kv_t = z_obs_t[:, t, :, :]
-            q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
+            #q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
+            q_t = torch.cat([z_text_proj, action_token_batch], dim=1)
             #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
             #print(f"actor_input: {actor_input_t.shape}")
             latent_actor_action_t = self.actor(q_t, kv_t)
@@ -136,7 +135,8 @@ class TransformerActionJEPA(nn.Module):
         refiner_actions_list = []
         for t in range(self.T):
             kv_t = torch.cat([z_obs_t[:, t, :, :], z_pred_t[:,t,:,:]], dim=1)
-            q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
+            #q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
+            q_t = torch.cat([z_text_proj, action_token_batch], dim=1)
             #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
             #print(f"actor_input: {actor_input_t.shape}")
             latent_refiner_action_t = self.refiner(q_t, kv_t)
