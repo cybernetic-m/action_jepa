@@ -14,13 +14,12 @@ import textwrap
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone = False, interpolation = cv2.INTER_LINEAR):
+def preprocess_libero_dataset(hdf5_path, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, use_backbone = True, interpolation = cv2.INTER_LINEAR):
    
    # Create the output directory if it does not exist where to save the .pt file
    parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
    dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
-   dir_name = f"{dataset_name}_num_frames_{model.num_frames}"
-   os.makedirs(os.path.join(output_dir, dir_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
+   os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
 
    # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
    files = glob.glob(hdf5_path)
@@ -29,7 +28,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
       raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
    
    # Dictionary we will save in json to remember correspondances between tasks and name id that we save
-   task_info = {}
+   preprocessing_info = {}
    
    # We discard the demo in which the task is not finished as "non_success" and we count how much there are
    count_success = 0
@@ -37,15 +36,16 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
 
    # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
    if use_backbone:
-    device = model.vision_backbone.device
-    print(f"Preprocessing using feature extraction with {model.vision_backbone.__class__.__name__} vision backbone and {model.language_backbone.__class__.__name__} language backbone on device: {device}")
-
+    device = vision_backbone.device
+    print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
+   
+   preprocessing_info['num_frames'] = num_frames 
    # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
    for task_idx, file_path in enumerate(files):
     
     # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
     task_name = os.path.basename(file_path).replace(".hdf5","")
-    task_info[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+    preprocessing_info[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
 
     with h5py.File(file_path, 'r') as f:
         # problem_info is a dict of the type .. that contain 'language_instruction'
@@ -55,7 +55,8 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
         # Preprocessing using the CLIP ENCODER backbone if needed
         if use_backbone:
           with torch.no_grad():
-            z_text = model.preprocess_text(text_instruction).cpu()
+            z_tokens = language_backbone.tokenization(text_instruction)
+            z_text = language_backbone(z_tokens).cpu()
         
         for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
 
@@ -101,7 +102,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
           frames_repeated = frames_repeated[1:-1] # eliminate first and last frame (1,2,2,3,3,4)
 
           # Copying for num_frames the first frame (needed for inference)
-          frames_firstRepeated = np.repeat(frames_repeated[0:1], model.num_frames, axis = 0)
+          frames_firstRepeated = np.repeat(frames_repeated[0:1], num_frames, axis = 0)
           frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
 
           # Resize the frames from original size 128x128 to 256x256 size
@@ -119,21 +120,36 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
           actions = demo['actions'][:]
 
           # We need to put zero actions for the num_frames repeated first frame!
-          action_padding = np.zeros((model.num_frames // 2, model.action_dim))
+          action_padding = np.zeros((num_frames // 2, action_dim))
           actions_padded = np.concatenate([action_padding, actions], axis=0)
 
           # We will save also the joint states
           joint_states = demo['obs']['joint_states'][:]
           
           # We do the same padding for joints
-          joint_padding = np.repeat(joint_states[0:1], model.num_frames // 2, axis = 0)
+          joint_padding = np.repeat(joint_states[0:1], num_frames // 2, axis = 0)
           joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
 
           # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
           if use_backbone:
             with torch.no_grad():
               # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
-              z_obs = model.preprocess_frames(frames_resized).cpu()
+              z_frames = vision_backbone.preprocess_frames(frames_resized)
+              
+              # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
+              chunk_size = 30 
+              z_obs_chunks = []
+        
+              for i in range(0, z_frames.shape[0], chunk_size):
+                
+                batch_chunk = z_frames[i : i + chunk_size].to(device)
+                
+                z_chunk = vision_backbone(batch_chunk).cpu() 
+                z_obs_chunks.append(z_chunk)
+                
+                del batch_chunk
+        
+            z_obs = torch.cat(z_obs_chunks, dim=1)
 
             # Cutting actions and states that exceed the dimensione of z_obs steps
             steps = z_obs.shape[1] // 256  
@@ -168,14 +184,14 @@ def preprocess_libero_dataset(hdf5_path, output_dir, model = None, use_backbone 
           
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
-          torch.save(data, os.path.join(output_dir, dir_name, save_name))
+          torch.save(data, os.path.join(output_dir, dataset_name, save_name))
    
-   task_info['success_demo'] = count_success
-   task_info['non_success_demo'] = count_nonsuccess
+   preprocessing_info['success_demo'] = count_success
+   preprocessing_info['non_success_demo'] = count_nonsuccess
 
    # Saving the correspondance map in json file
-   with open(os.path.join(output_dir, dataset_name, 'task_info.json'), 'w') as f:
-    json.dump(task_info, f)
+   with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
+    json.dump(preprocessing_info, f)
    
 
 def demo_animator(demo_pt_path):

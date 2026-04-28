@@ -31,7 +31,6 @@ class VJEPAEncoder(nn.Module):
                 param.requires_grad = True
             self.vision_encoder.train() # Put the encoder in train mode
             
-    
     def preprocess_frames(self, video_frames):
         # Preprocess the input frames using the processor
         vision_patches = self.vision_processor(videos=video_frames, return_tensors="pt").to(self.device)

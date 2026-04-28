@@ -18,7 +18,8 @@ import torch
 import json
 import os
 import cv2
-from model.TransformerActionJEPA import TransformerActionJEPA
+from model.modules.CLIPEncoder import CLIPEncoder
+from model.modules.VJEPAEncoder import VJEPAEncoder
 
 if __name__ == "__main__":
         
@@ -39,6 +40,7 @@ if __name__ == "__main__":
     NUM_FRAMES = config['num_frames']
     DATASET_TYPE = config['dataset_type']
     INTERPOLATION_TYPE = config['interpolation_type']
+    NUM_FRAMES = config['num_frames']
 
     interpolation_dict= {
     "nearest": cv2.INTER_NEAREST,
@@ -63,17 +65,10 @@ if __name__ == "__main__":
         checkpoints_path = "../checkpoints"
         # Path for all the models
         vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
-        vjepa_pred_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
         clip_path = os.path.join(checkpoints_path,"openai/clip-vit-large-patch14")
-
-        model = TransformerActionJEPA(
-            vjepa_encoder_path=vjepa_path,
-            vjepa_predictor_path=vjepa_pred_path,
-            clip_model_path=clip_path,
-            num_frames=NUM_FRAMES,
-            use_backbone = True,
-            device=device
-        ).to(device)
+ 
+        vision_backbone = VJEPAEncoder(model_path=vjepa_path, frozen=True, device=device)
+        language_backbone = CLIPEncoder(model_path=clip_path, frozen=True, device=device)
 
     else:
         vision_backbone = None
@@ -84,7 +79,10 @@ if __name__ == "__main__":
                                 hdf5_path=path,
                                 output_dir=processed_data_dir, 
                                 use_backbone = PREPROCESSING_WITH_BACKBONE,
-                                model=model,
+                                vision_backbone = vision_backbone,
+                                language_backbone = language_backbone,
+                                num_frames = NUM_FRAMES,
+                                action_dim = 7,
                                 interpolation=interpolation
                                 )
 
