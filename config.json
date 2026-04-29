@@ -10,5 +10,6 @@
     "dataset_type": "libero_goal",
     "interpolation_type": "linear",
     "policy": "transformer",
-    "mixed_precision": true
+    "mixed_precision": true,
+    "num_workers": 11
 }

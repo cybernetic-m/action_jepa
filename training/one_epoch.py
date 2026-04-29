@@ -37,7 +37,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
 
             with autocast(device_type='cuda', enabled=(device == 'cuda')):
                 # Making the predictions
-                actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
+                actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input)#, joint_input)
 
                 # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
                 loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)

@@ -95,7 +95,7 @@ def preprocess_libero_dataset(hdf5_path, output_dir, num_frames = 4, action_dim 
 
           # Flipping all the frames vertically because the original ones are flipped
           frames_flipped = np.flip(frames[::], axis=1)
-
+          
           # From a sequence of frames as (1,2,3,4) I want to create another sequence that contain each pair (1,2,2,3,3,4)
           # because V JEPA takes (1,2) - (2,3) - (3,4) to extract z_obs features!
           frames_repeated = np.repeat(frames_flipped, 2, axis=0) # this create (1,1,2,2,3,3,4,4)

@@ -31,7 +31,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     datasets_dir = "../LIBERO/libero/datasets"
-    processed_data_dir ='../processed_data'
+    processed_data_dir ='../processed_data/trial'
     
     with open('../config.json', 'r') as f:
         config = json.load(f)
