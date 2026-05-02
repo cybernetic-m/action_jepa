@@ -9,16 +9,21 @@ import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.abspath(os.path.join(script_dir, "../"))
 
-# Aggiunge la root e LIBERO al path
-if root_path not in sys.path:
-    sys.path.insert(0, root_path)
+libero_path = os.path.join(root_path, "LIBERO")
+model_path = os.path.join(root_path, "model")
+if libero_path not in sys.path:
+    sys.path.insert(0, libero_path)
+if model_path not in sys.path:
+    sys.path.insert(0, model_path)
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 
 from utils import preprocess_data, resample_data
 import torch
 import json
 import os
-from model.modules.CLIPEncoder import CLIPEncoder
-from model.modules.VJEPAEncoder import VJEPAEncoder
+#from model.modules.CLIPEncoder import CLIPEncoder
+#from model.modules.VJEPAEncoder import VJEPAEncoder
 import glob
 
 if __name__ == "__main__":

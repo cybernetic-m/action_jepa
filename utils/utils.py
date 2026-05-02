@@ -1,15 +1,23 @@
 import sys
 import os
-current_dir = os.getcwd()
-libero_path = os.path.join(current_dir, "LIBERO")
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+root_path = os.path.abspath(os.path.join(script_dir, "../"))
+
+libero_path = os.path.join(root_path, "LIBERO")
+model_path = os.path.join(root_path, "model")
+
 if libero_path not in sys.path:
     sys.path.insert(0, libero_path)
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+if model_path not in sys.path:
+    sys.path.insert(0, model_path)
+
 
 import numpy as np
 import torch
-#import cv2
+import cv2
 import h5py
 import glob
 import json
@@ -52,9 +60,16 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
   env.seed(0) # set a seed for reproducibility
 
   # Create the output directory if it does not exist where to save the .pt file
-  parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
-  dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
-  os.makedirs(os.path.join(output_dir, dataset_name, task_name), exist_ok=True) # create the directory of the type ./dataset/libero_10/KITCHEN_SCENE...
+  # 1. Prendi il nome del task dal file HDF5 (più sicuro per la coerenza dei file)
+  hdf5_filename = os.path.basename(hdf5_path).replace(".hdf5", "")
+
+  # 2. Crea il percorso completo
+  parent_directory = os.path.dirname(hdf5_path)
+  dataset_name = os.path.basename(parent_directory)
+  task_output_dir = os.path.join(output_dir, dataset_name, hdf5_filename)
+
+  # 3. Crea la cartella (usa exist_ok=True)
+  os.makedirs(task_output_dir, exist_ok=True)
 
   if not hdf5_path:
     raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
@@ -113,7 +128,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
         data = {
             'frames': np.array(frames, dtype=np.uint8),
             'text_instruction': text_instruction,
-            'joint_states': torch.tensor(joint_states, dtype=torch.float32),
+            'joint_states': torch.from_numpy(np.array(joint_states)).float(),
             'actions': torch.tensor(actions, dtype=torch.float32)
         }
 
@@ -121,7 +136,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
           count_success += 1
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_id}_{demo_id}.pt"
-          torch.save(data, os.path.join(output_dir, dataset_name, task_name, save_name))
+          torch.save(data, os.path.join(task_output_dir, save_name))
         else:
             count_nonsuccess += 1
   
