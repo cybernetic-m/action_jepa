@@ -216,6 +216,7 @@ checkpoints
 # To not push data
 data
 processed_data
+resampled_data
 # To ignore the results
 results
 hf_token.txt
