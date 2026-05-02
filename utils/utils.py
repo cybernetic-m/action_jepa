@@ -1,47 +1,166 @@
+import sys
+import os
+current_dir = os.getcwd()
+libero_path = os.path.join(current_dir, "LIBERO")
+if libero_path not in sys.path:
+    sys.path.insert(0, libero_path)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 import numpy as np
 import torch
-import cv2
+#import cv2
 import h5py
 import glob
 import json
 import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import glob
 from matplotlib.animation import FuncAnimation
 import matplotlib as mpl
 from scipy.spatial.transform import Rotation as R
 import textwrap
+from libero.libero import benchmark
+from libero.libero.envs.env_wrapper import ControlEnv
+from libero.libero.utils import get_libero_path
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
-def preprocess_libero_dataset(hdf5_path, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, use_backbone = True, interpolation = cv2.INTER_LINEAR):
-   
-   # Create the output directory if it does not exist where to save the .pt file
-   parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
-   dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
-   os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
+def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
 
-   # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
-   files = glob.glob(hdf5_path)
+  benchmark_dict = benchmark.get_benchmark_dict() # dictionary of the type {"<task_suite_name>": <task_suite_class>} (Ex. "libero_spatial": <class 'libero.libero.benchmark.LIBERO_SPATIAL'>)
+  task_suite = benchmark_dict[task_suite_name]() # task suite is a class that represents a set of different tasks, we'll retrieve a specific task with the task_id
+  task = task_suite.get_task(task_id) # task is the object with all the information about the specific task
+  task_name = task.name # the name of the task as "KITCHEN_SCENE_1_put_the_black_bowl_at_the_front_on_the_coffee_table"  
+  task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
 
-   if not files:
-      raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
-   
-   # Dictionary we will save in json to remember correspondances between tasks and name id that we save
-   preprocessing_info = {}
-   
-   # We discard the demo in which the task is not finished as "non_success" and we count how much there are
-   count_success = 0
-   count_nonsuccess = 0
+  # Args for environment initialization
+  env_args = {
+      "bddl_file_name": task_bddl_file, # path of the BDDL file
+      "camera_heights": 256,
+      "camera_widths": 256,
+      "camera_names": ["agentview"],
+      "has_renderer": False, # If True, open the MuJoCo screen to render the env
+      "has_offscreen_renderer": True, # If True, save images rendered to create a video
+      "use_camera_obs": True, # If True, the "obs" will include camera observations (e.g., RGB images) that can be used to create a video.
+      "controller": "OSC_POSE",
+      "control_freq": 20
+  }
 
-   # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
-   if use_backbone:
-    device = vision_backbone.device
-    print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
+  env = ControlEnv(**env_args) # create the env class
+  env.seed(0) # set a seed for reproducibility
+
+  # Create the output directory if it does not exist where to save the .pt file
+  parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
+  dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
+  os.makedirs(os.path.join(output_dir, dataset_name, task_name), exist_ok=True) # create the directory of the type ./dataset/libero_10/KITCHEN_SCENE...
+
+  if not hdf5_path:
+    raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
+  
+  # Dictionary we will save in json to remember correspondances between tasks and name id that we save
+  preprocessing_info = {}
    
-   preprocessing_info['num_frames'] = num_frames 
-   # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
-   for task_idx, file_path in enumerate(files):
+  # We discard the demo in which the task is not finished as "non_success" and we count how much there are
+  count_success = 0
+  count_nonsuccess = 0  
+    
+  # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
+  task_name = os.path.basename(hdf5_path).replace(".hdf5","")
+  preprocessing_info[task_id] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+
+  with h5py.File(hdf5_path, 'r') as f:
+      # problem_info is a dict of the type .. that contain 'language_instruction'
+      problem_info = json.loads(f['data'].attrs['problem_info'])
+      text_instruction = problem_info['language_instruction'] 
+      
+      for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
+
+        success = False
+        env.reset() # reset the scene and bring to initial state
+        demo = f['data'][demo_id]
+        actions = demo['actions'][:].tolist()
+        states = demo['states'][:]
+
+        env.set_init_state(states[0])
+
+        frames = []
+        joint_states = []
+        zero_action = [0.0]*7
+        
+        obs, _, _, _ = env.step(zero_action)
+        frame = np.flip(obs["agentview_image"], axis=0)
+        frames.append(frame)
+        joint_states.append(obs["robot0_joint_pos"])
+
+        # Trajectory execution
+        for i in range(len(actions)):
+            
+            obs, _, done, _ = env.step(actions[i])
+          
+            frame = np.flip(obs["agentview_image"], axis=0)
+            
+            frames.append(frame)
+            joint_states.append(obs["robot0_joint_pos"])
+
+            if done: 
+              success = True
+              break
+        
+        actions.append(zero_action)
+
+        data = {
+            'frames': np.array(frames, dtype=np.uint8),
+            'text_instruction': text_instruction,
+            'joint_states': torch.tensor(joint_states, dtype=torch.float32),
+            'actions': torch.tensor(actions, dtype=torch.float32)
+        }
+
+        if success:
+          count_success += 1
+          # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
+          save_name = f"task_{task_id}_{demo_id}.pt"
+          torch.save(data, os.path.join(output_dir, dataset_name, task_name, save_name))
+        else:
+            count_nonsuccess += 1
+  
+  preprocessing_info['success_demo'] = count_success
+  preprocessing_info['non_success_demo'] = count_nonsuccess
+
+  env.close()
+
+    # Saving the correspondance map in json file
+  with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
+    json.dump(preprocessing_info, f)
+
+def preprocess_data(hdf5_path, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, interpolation = cv2.INTER_LINEAR):
+   
+  # Create the output directory if it does not exist where to save the .pt file
+  parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
+  dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
+  os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
+
+  # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
+  files = glob.glob(hdf5_path)
+
+  if not files:
+    raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
+   
+  # Dictionary we will save in json to remember correspondances between tasks and name id that we save
+  preprocessing_info = {}
+   
+  # We discard the demo in which the task is not finished as "non_success" and we count how much there are
+  count_success = 0
+  count_nonsuccess = 0
+
+  # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
+  device = vision_backbone.device
+  print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
+   
+  preprocessing_info['num_frames'] = num_frames 
+  # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
+  for task_idx, file_path in enumerate(files):
     
     # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
     task_name = os.path.basename(file_path).replace(".hdf5","")
@@ -53,10 +172,9 @@ def preprocess_libero_dataset(hdf5_path, output_dir, num_frames = 4, action_dim 
         text_instruction = problem_info['language_instruction'] # the text instruction
 
         # Preprocessing using the CLIP ENCODER backbone if needed
-        if use_backbone:
-          with torch.no_grad():
-            z_tokens = language_backbone.tokenization(text_instruction)
-            z_text = language_backbone(z_tokens).cpu()
+        with torch.no_grad():
+          z_tokens = language_backbone.tokenization(text_instruction)
+          z_text = language_backbone(z_tokens).cpu()
         
         for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
 
@@ -131,66 +249,57 @@ def preprocess_libero_dataset(hdf5_path, output_dir, num_frames = 4, action_dim 
           joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
 
           # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
-          if use_backbone:
-            with torch.no_grad():
-              # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
-              z_frames = vision_backbone.preprocess_frames(frames_resized)
-              
-              # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
-              chunk_size = 30 
-              z_obs_chunks = []
-        
-              for i in range(0, z_frames.shape[0], chunk_size):
-                
-                batch_chunk = z_frames[i : i + chunk_size].to(device)
-                
-                z_chunk = vision_backbone(batch_chunk).cpu() 
-                z_obs_chunks.append(z_chunk)
-                
-                del batch_chunk
-        
-            z_obs = torch.cat(z_obs_chunks, dim=1)
-
-            # Cutting actions and states that exceed the dimensione of z_obs steps
-            steps = z_obs.shape[1] // 256  
-
-            # Tronchiamo azioni e giunti per farli combaciare al 100%
-            if actions_padded.shape[0] > steps:
-                actions_padded = actions_padded[:steps]
-                joints_states_padded = joints_states_padded[:steps]
+          with torch.no_grad():
+            # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
+            z_frames = vision_backbone.preprocess_frames(frames_resized)
             
-            #print(f"frames: {frames.shape}")
-            #print(f"frames repeated: {frames_repeated.shape}")
-            #print(f"frames padded: {frames_padded.shape}")
-            #print(f"z_obs: {z_obs.shape}")
-            #print(f"joint_states: {joints_states_padded.shape}")
-            #print(f"actions: {actions_padded.shape}")
+            # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
+            chunk_size = 30 
+            z_obs_chunks = []
+      
+            for i in range(0, z_frames.shape[0], chunk_size):
               
-            data = {"z_obs": z_obs.half(), # saving in float16 to save space
-                    "z_text": z_text.half(), # saving in float16 to save space
-                    #"ee_states": torch.from_numpy(ee_states).float(),
-                    "joint_states": torch.from_numpy(joints_states_padded).float(),
-                    "actions": torch.from_numpy(actions_padded).float(),
-                    "success": torch.tensor(is_success, dtype=torch.bool)
-                    }
-          else:
-            data = {"frames": torch.from_numpy(np.array(frames_resized)).byte(),
-                    "text_instruction": text_instruction,
-                    #"ee_states": torch.from_numpy(ee_states).float(),
-                    "joint_states": torch.from_numpy(joint_states).float(),
-                    "actions": torch.from_numpy(actions).float(),
-                    "success": torch.tensor(is_success, dtype=torch.bool)
-                    }
+              batch_chunk = z_frames[i : i + chunk_size].to(device)
+              
+              z_chunk = vision_backbone(batch_chunk).cpu() 
+              z_obs_chunks.append(z_chunk)
+              
+              del batch_chunk
+      
+          z_obs = torch.cat(z_obs_chunks, dim=1)
+
+          # Cutting actions and states that exceed the dimensione of z_obs steps
+          steps = z_obs.shape[1] // 256  
+
+          # Tronchiamo azioni e giunti per farli combaciare al 100%
+          if actions_padded.shape[0] > steps:
+              actions_padded = actions_padded[:steps]
+              joints_states_padded = joints_states_padded[:steps]
           
+          #print(f"frames: {frames.shape}")
+          #print(f"frames repeated: {frames_repeated.shape}")
+          #print(f"frames padded: {frames_padded.shape}")
+          #print(f"z_obs: {z_obs.shape}")
+          #print(f"joint_states: {joints_states_padded.shape}")
+          #print(f"actions: {actions_padded.shape}")
+            
+          data = {"z_obs": z_obs.half(), # saving in float16 to save space
+                  "z_text": z_text.half(), # saving in float16 to save space
+                  #"ee_states": torch.from_numpy(ee_states).float(),
+                  "joint_states": torch.from_numpy(joints_states_padded).float(),
+                  "actions": torch.from_numpy(actions_padded).float(),
+                  "success": torch.tensor(is_success, dtype=torch.bool)
+                  }
+      
           # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_idx}_{demo_id}.pt"
           torch.save(data, os.path.join(output_dir, dataset_name, save_name))
    
-   preprocessing_info['success_demo'] = count_success
-   preprocessing_info['non_success_demo'] = count_nonsuccess
+  preprocessing_info['success_demo'] = count_success
+  preprocessing_info['non_success_demo'] = count_nonsuccess
 
    # Saving the correspondance map in json file
-   with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
+  with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
     json.dump(preprocessing_info, f)
    
 
