@@ -19,12 +19,11 @@ import numpy as np
 import torch
 import cv2
 import h5py
-import glob
 import json
-import os
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import glob
+import imageio
 from matplotlib.animation import FuncAnimation
 import matplotlib as mpl
 from scipy.spatial.transform import Rotation as R
@@ -35,6 +34,35 @@ from libero.libero.utils import get_libero_path
 
 mpl.rcParams['animation.embed_limit'] = 500.0
 
+
+def draw_text(img, text, position, font, font_scale, color, color_border, thickness, max_width):
+
+  # Take the words
+  words = text.split(" ")
+  lines = []
+  current_line = ""
+
+  # Iterating over the words, we add to a line only if the line width is not exceeding the max_width
+  for word in words:
+     line = current_line + word + " "
+     (line_width, _), _ = cv2.getTextSize(line, font, font_scale, thickness) # Taking the width
+
+     if line_width < max_width:
+        current_line = line
+     else:
+        lines.append(line)
+        current_line = word + ""
+
+  lines.append(current_line) # for the last line is needed
+
+  x, y = position
+  
+  for line in lines:
+    
+    cv2.putText(img, text, (x,y), font, font_scale, color_border, thickness+2) # Border
+    cv2.putText(img, text, (x,y), font, font_scale, color, thickness)
+    y += int(20 * font_scale + 10) # y spaces between lines
+
 def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
 
   benchmark_dict = benchmark.get_benchmark_dict() # dictionary of the type {"<task_suite_name>": <task_suite_class>} (Ex. "libero_spatial": <class 'libero.libero.benchmark.LIBERO_SPATIAL'>)
@@ -42,7 +70,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
   task = task_suite.get_task(task_id) # task is the object with all the information about the specific task
   task_name = task.name # the name of the task as "KITCHEN_SCENE_1_put_the_black_bowl_at_the_front_on_the_coffee_table"  
   task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
-
+  
   # Args for environment initialization
   env_args = {
       "bddl_file_name": task_bddl_file, # path of the BDDL file
@@ -59,262 +87,238 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
   env = ControlEnv(**env_args) # create the env class
   env.seed(0) # set a seed for reproducibility
 
-  # Create the output directory if it does not exist where to save the .pt file
-  # 1. Prendi il nome del task dal file HDF5 (più sicuro per la coerenza dei file)
-  hdf5_filename = os.path.basename(hdf5_path).replace(".hdf5", "")
+  try:
+    parent_directory = os.path.dirname(hdf5_path)
+    dataset_name = os.path.basename(parent_directory)
 
-  # 2. Crea il percorso completo
-  parent_directory = os.path.dirname(hdf5_path)
-  dataset_name = os.path.basename(parent_directory)
-  task_output_dir = os.path.join(output_dir, dataset_name, hdf5_filename)
-
-  # 3. Crea la cartella (usa exist_ok=True)
-  os.makedirs(task_output_dir, exist_ok=True)
-
-  if not hdf5_path:
-    raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
-  
-  # Dictionary we will save in json to remember correspondances between tasks and name id that we save
-  preprocessing_info = {}
-   
-  # We discard the demo in which the task is not finished as "non_success" and we count how much there are
-  count_success = 0
-  count_nonsuccess = 0  
+    dataset_dir = os.path.join(output_dir, dataset_name)
+    os.makedirs(dataset_dir, exist_ok=True)
     
-  # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
-  task_name = os.path.basename(hdf5_path).replace(".hdf5","")
-  preprocessing_info[task_id] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+    task_output_dir = os.path.join(output_dir, dataset_name, str(task_id))
+    os.makedirs(task_output_dir, exist_ok=True)
+    
+    # Create a dir for gifs
+    gif_output_dir = os.path.join(task_output_dir, 'gifs')
+    os.makedirs(gif_output_dir, exist_ok=True)
 
-  with h5py.File(hdf5_path, 'r') as f:
-      # problem_info is a dict of the type .. that contain 'language_instruction'
-      problem_info = json.loads(f['data'].attrs['problem_info'])
-      text_instruction = problem_info['language_instruction'] 
-      
-      for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
+    # Create a data dir to save .pt file 
+    data_output_dir = os.path.join(task_output_dir, 'data')
+    os.makedirs(data_output_dir, exist_ok=True)
 
-        success = False
-        env.reset() # reset the scene and bring to initial state
-        demo = f['data'][demo_id]
-        actions = demo['actions'][:].tolist()
-        states = demo['states'][:]
+    if not hdf5_path:
+      raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
+    
+    # Dictionary we will save in json to remember correspondances between tasks and name id that we save
+    preprocessing_info = {}
+    
+    # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
+    task_name = os.path.basename(hdf5_path).replace(".hdf5","")
+    preprocessing_info[task_id] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
 
-        env.set_init_state(states[0])
-
-        frames = []
-        joint_states = []
-        zero_action = [0.0]*7
+    with h5py.File(hdf5_path, 'r') as f:
+        # problem_info is a dict of the type .. that contain 'language_instruction'
+        problem_info = json.loads(f['data'].attrs['problem_info'])
+        text_instruction = problem_info['language_instruction'] 
         
-        obs, _, _, _ = env.step(zero_action)
-        frame = np.flip(obs["agentview_image"], axis=0)
-        frames.append(frame)
-        joint_states.append(obs["robot0_joint_pos"])
-
-        # Trajectory execution
-        for i in range(len(actions)):
-            
-            obs, _, done, _ = env.step(actions[i])
+        demo_data = f['data']
+        demo_keys = sorted(list(demo_data.keys()))
+        
+        for demo_id in tqdm(demo_keys, desc=f"{task_name}"):
           
-            frame = np.flip(obs["agentview_image"], axis=0)
+          env.reset()
+          
+          demo = demo_data[demo_id]
+
+          actions = demo['actions'][:].tolist()
+          states = demo['states'][:]
+
+          env.set_init_state(states[0]) # set the init_state from the demo
+
+          frames = []
+          joint_states = []
+          zero_action = [0.0]*7
+          
+          obs, _, _, _ = env.step(zero_action)
+          frame = np.flip(obs["agentview_image"], axis=0)
+          frames.append(frame)
+          joint_states.append(obs["robot0_joint_pos"])
+
+          # Trajectory execution
+          for i in range(len(actions)):
+              
+              obs, _, done, _ = env.step(actions[i])
             
-            frames.append(frame)
-            joint_states.append(obs["robot0_joint_pos"])
+              frame = np.flip(obs["agentview_image"], axis=0)
+              
+              frames.append(frame)
+              joint_states.append(obs["robot0_joint_pos"])
 
-            if done: 
-              success = True
-              break
+              if done: 
+                break
+          
+          actions.append(zero_action)
+
+          data = {
+              'frames': np.array(frames, dtype=np.uint8),
+              'text_instruction': text_instruction,
+              'joint_states': torch.from_numpy(np.array(joint_states)).float(),
+              'actions': torch.tensor(actions, dtype=torch.float32)
+          }
+
         
-        actions.append(zero_action)
-
-        data = {
-            'frames': np.array(frames, dtype=np.uint8),
-            'text_instruction': text_instruction,
-            'joint_states': torch.from_numpy(np.array(joint_states)).float(),
-            'actions': torch.tensor(actions, dtype=torch.float32)
-        }
-
-        if success:
-          count_success += 1
-          # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
           save_name = f"task_{task_id}_{demo_id}.pt"
-          torch.save(data, os.path.join(task_output_dir, save_name))
-        else:
-            count_nonsuccess += 1
-  
-  preprocessing_info['success_demo'] = count_success
-  preprocessing_info['non_success_demo'] = count_nonsuccess
+          torch.save(data, os.path.join(data_output_dir, save_name))
+          
+          # Saving a GIF 
+          gif_frames = []
 
-  env.close()
+          for frame_to_gif in frames:
+              # Copying the image
+              img = frame_to_gif.copy()
 
+              # Drawing the text into the image 
+              draw_text(
+                img = img,
+                text = text_instruction,
+                position = (10,240),
+                font = cv2.FONT_HERSHEY_SIMPLEX,
+                font_scale = 0.25,
+                color = (255,255,255),
+                color_border = (0,0,0),
+                thickness = 1,
+                max_width = 200
+              )
+
+              gif_frames.append(img)
+          
+          gif_path = os.path.join(gif_output_dir, f"task_{task_id}_{demo_id}.gif")
+          imageio.mimsave(gif_path, gif_frames, duration=50, loop=0)
+            
     # Saving the correspondance map in json file
-  with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
-    json.dump(preprocessing_info, f)
+    with open(os.path.join(task_output_dir, f'info.json'), 'w') as f:
+      json.dump(preprocessing_info, f, indent=4)
 
-def preprocess_data(hdf5_path, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, interpolation = cv2.INTER_LINEAR):
+  finally:
+     env.close()
+     del env
+
+def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None):
    
   # Create the output directory if it does not exist where to save the .pt file
-  parent_directory = os.path.dirname(hdf5_path) # take the parent directory without the name of the file hdf5
-  dataset_name = os.path.basename(parent_directory) # extract the last part of the path, i.e. the name of the dataset ex: "libero_10", "libero_goal"...
-  os.makedirs(os.path.join(output_dir, dataset_name), exist_ok=True) # create the directory of the type ./processed_data/libero_10
+  # The data_dir is a path of the type ../resampled_data/libero_goal/1 where we extract "libero_goal" as dataset_name and '1' as task_id
+  dataset_name = data_dir.split('/')[-2] 
+  task_id = data_dir.split('/')[-1] 
+  os.makedirs(os.path.join(output_dir, dataset_name, task_id), exist_ok=True) # create the directory of the type ./processed_data/libero_goal/2
 
-  # List of all the files hdf5 in the path ['./path_to_file1/file1.hdf5', ....]
-  files = glob.glob(hdf5_path)
+  # List of all the path files .pt resampled (Ex. task_2_demo_2.pt) 
+  files = sorted(glob.glob(os.path.join(data_dir, 'data', '*.pt')))
 
-  if not files:
-    raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
-   
   # Dictionary we will save in json to remember correspondances between tasks and name id that we save
   preprocessing_info = {}
    
-  # We discard the demo in which the task is not finished as "non_success" and we count how much there are
-  count_success = 0
-  count_nonsuccess = 0
-
   # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
   device = vision_backbone.device
   print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
-   
-  preprocessing_info['num_frames'] = num_frames 
+  
+  # Reading the old file to store the correspondance between task_id and task instruction
+  with open(os.path.join(data_dir, 'info.json'), encoding='utf-8') as f:
+     info = json.load(f)
+
+  sample_data = torch.load(files[0], weights_only=False)
+  text_instruction = sample_data.get('text_instruction', "")
+
+  preprocessing_info = {
+        "task_id": task_id,
+        "task_name": info.get(task_id, "unknown_task"),
+        "text_instruction": text_instruction,
+        "num_frames": num_frames
+    }
+
+  # Preprocessing using the CLIP ENCODER backbone if needed
+  with torch.no_grad():
+    z_tokens = language_backbone.tokenization(text_instruction)
+    z_text = language_backbone(z_tokens).cpu()
+
   # Iterating in all the file paths: each file is formed by different "demo" with a demo_id: 'demo_1', 'demo_2' ...
-  for task_idx, file_path in enumerate(files):
+  for file_path in tqdm(files, desc=f"Task ID: {task_id}"):
     
-    # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
-    task_name = os.path.basename(file_path).replace(".hdf5","")
-    preprocessing_info[task_idx] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
+    # From the entire path name ./path_to_file1/file1.pt take only the final part file1.pt eliminating .pt
+    task_name = os.path.basename(file_path).replace(".pt","")
+    
+    # Loading all the important informations
+    resampled_data = torch.load(file_path, weights_only=False)
+    frames = resampled_data['frames']
+    text_instruction = resampled_data['text_instruction']
+    joint_states = resampled_data['joint_states'].numpy()
+    actions = resampled_data['actions'].numpy()
 
-    with h5py.File(file_path, 'r') as f:
-        # problem_info is a dict of the type .. that contain 'language_instruction'
-        problem_info = json.loads(f['data'].attrs['problem_info'])
-        text_instruction = problem_info['language_instruction'] # the text instruction
+    # From a sequence of frames as (1,2,3,4) I want to create another sequence that contain each pair (1,2,2,3,3,4)
+    # because V JEPA takes (1,2) - (2,3) - (3,4) to extract z_obs features!
+    frames_repeated = np.repeat(frames, 2, axis=0) # this create (1,1,2,2,3,3,4,4)
+    frames_repeated = frames_repeated[1:-1] # eliminate first and last frame (1,2,2,3,3,4)
 
-        # Preprocessing using the CLIP ENCODER backbone if needed
-        with torch.no_grad():
-          z_tokens = language_backbone.tokenization(text_instruction)
-          z_text = language_backbone(z_tokens).cpu()
+    # Copying for num_frames the first frame (needed for inference)
+    frames_firstRepeated = np.repeat(frames_repeated[0:1], num_frames, axis = 0)
+    frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
+
+    # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
+    # where D means delta values of translations (first three), axis angle orientation (second three)
+    # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
+    # We need to put zero actions for the num_frames repeated first frame!
+    action_padding = np.zeros((num_frames // 2, action_dim))
+    actions_padded = np.concatenate([action_padding, actions], axis=0)
+
+    # We do the same padding for joints
+    joint_padding = np.repeat(joint_states[0:1], num_frames // 2, axis = 0)
+    joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
+
+    # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
+    with torch.no_grad():
+      # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
+      z_frames = vision_backbone.preprocess_frames(frames_padded)
+      
+      # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
+      chunk_size = 30 
+      z_obs_chunks = []
+
+      for i in range(0, z_frames.shape[0], chunk_size):
         
-        for demo_id in tqdm(f['data'].keys(), desc=f"{task_name}"):
+        batch_chunk = z_frames[i : i + chunk_size].to(device)
+        
+        z_chunk = vision_backbone(batch_chunk).cpu() 
+        z_obs_chunks.append(z_chunk)
+        
+        del batch_chunk
 
-          demo = f['data'][demo_id]
-          
-          # We take the dones = [0, 0, 0, ...., 1] if there is one at last step, is success!
-          # We use it to discard non success demo
-          dones = demo['dones'][:]
-          is_success = (dones[-1] == 1) # True if there is 1 at last step
+    z_obs = torch.cat(z_obs_chunks, dim=1)
 
-          # If there is not a success we increment the counter of non success and skip this demo
-          # otherwise we increment the success counter and take this demo
-          if not is_success:
-            count_nonsuccess +=1
-            continue
+    # Cutting actions and states that exceed the dimensione of z_obs steps
+    steps = z_obs.shape[1] // 256  
 
-          count_success += 1
-
-          # Take all the frames in the demo 
-          frames = demo['obs']['agentview_rgb'][:]  # (T, H, W, 3)
-
-          # Save the values T (time, num of frames), H (Height), W (Width), C (Channels)
-          T, H, W, C = frames.shape
-          
-          # Taking the corresponding end effector cartesian position, orientation and gripper states
-          #ee_pos = demo['obs']['ee_pos'][:] # (ee_x, ee_y, ee_z) three cartesian values of the end effector position
-          #ee_ori = demo['obs']['ee_ori'][:] # (r_x, r_y, r_z) three values in AXIS-ANGLE representation of the end effector orientation
-          
-          # For the gripper we have originally two values (ee_g_left, ee_g_right), equal in module but different in sign: ex. (0.0360, -0.0356)
-          # that represent the opening of the left and right part of the gripper with respect to the center
-          # I take the difference and divide by 2: (ee_g_left - ee_g_right) / 2 => (0.0360 - (-0.0356))/2 = 0.0715/2 = 0.0358
-          #ee_gripper_two_val = demo['obs']['gripper_states'][:] 
-          #ee_gripper = (ee_gripper_two_val[:,0] - ee_gripper_two_val[:,-1])/2
-          #ee_gripper = ee_gripper.reshape(-1, 1)
-          #ee_states = np.concatenate([ee_pos, ee_ori, ee_gripper], axis=1)
-
-          # Flipping all the frames vertically because the original ones are flipped
-          frames_flipped = np.flip(frames[::], axis=1)
-          
-          # From a sequence of frames as (1,2,3,4) I want to create another sequence that contain each pair (1,2,2,3,3,4)
-          # because V JEPA takes (1,2) - (2,3) - (3,4) to extract z_obs features!
-          frames_repeated = np.repeat(frames_flipped, 2, axis=0) # this create (1,1,2,2,3,3,4,4)
-          frames_repeated = frames_repeated[1:-1] # eliminate first and last frame (1,2,2,3,3,4)
-
-          # Copying for num_frames the first frame (needed for inference)
-          frames_firstRepeated = np.repeat(frames_repeated[0:1], num_frames, axis = 0)
-          frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
-
-          # Resize the frames from original size 128x128 to 256x256 size
-          new_size = (256, 256)
-          frames_resized = [] 
-
-          for t in range(len(frames_padded)):
-              frame = frames_padded[t]
-              resized_frame = cv2.resize(frame, new_size, interpolation=interpolation)
-              frames_resized.append(resized_frame)
-
-          # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
-          # where D means delta values of translations (first three), axis angle orientation (second three)
-          # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
-          actions = demo['actions'][:]
-
-          # We need to put zero actions for the num_frames repeated first frame!
-          action_padding = np.zeros((num_frames // 2, action_dim))
-          actions_padded = np.concatenate([action_padding, actions], axis=0)
-
-          # We will save also the joint states
-          joint_states = demo['obs']['joint_states'][:]
-          
-          # We do the same padding for joints
-          joint_padding = np.repeat(joint_states[0:1], num_frames // 2, axis = 0)
-          joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
-
-          # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
-          with torch.no_grad():
-            # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
-            z_frames = vision_backbone.preprocess_frames(frames_resized)
-            
-            # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
-            chunk_size = 30 
-            z_obs_chunks = []
+    # Tronchiamo azioni e giunti per farli combaciare al 100%
+    if actions_padded.shape[0] > steps:
+        actions_padded = actions_padded[:steps]
+        joints_states_padded = joints_states_padded[:steps]
+    
+    #print(f"frames: {frames.shape}")
+    #print(f"frames repeated: {frames_repeated.shape}")
+    #print(f"frames padded: {frames_padded.shape}")
+    #print(f"z_obs: {z_obs.shape}")
+    #print(f"joint_states: {joints_states_padded.shape}")
+    #print(f"actions: {actions_padded.shape}")
       
-            for i in range(0, z_frames.shape[0], chunk_size):
-              
-              batch_chunk = z_frames[i : i + chunk_size].to(device)
-              
-              z_chunk = vision_backbone(batch_chunk).cpu() 
-              z_obs_chunks.append(z_chunk)
-              
-              del batch_chunk
-      
-          z_obs = torch.cat(z_obs_chunks, dim=1)
-
-          # Cutting actions and states that exceed the dimensione of z_obs steps
-          steps = z_obs.shape[1] // 256  
-
-          # Tronchiamo azioni e giunti per farli combaciare al 100%
-          if actions_padded.shape[0] > steps:
-              actions_padded = actions_padded[:steps]
-              joints_states_padded = joints_states_padded[:steps]
-          
-          #print(f"frames: {frames.shape}")
-          #print(f"frames repeated: {frames_repeated.shape}")
-          #print(f"frames padded: {frames_padded.shape}")
-          #print(f"z_obs: {z_obs.shape}")
-          #print(f"joint_states: {joints_states_padded.shape}")
-          #print(f"actions: {actions_padded.shape}")
-            
-          data = {"z_obs": z_obs.half(), # saving in float16 to save space
-                  "z_text": z_text.half(), # saving in float16 to save space
-                  #"ee_states": torch.from_numpy(ee_states).float(),
-                  "joint_states": torch.from_numpy(joints_states_padded).float(),
-                  "actions": torch.from_numpy(actions_padded).float(),
-                  "success": torch.tensor(is_success, dtype=torch.bool)
-                  }
-      
-          # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'
-          save_name = f"task_{task_idx}_{demo_id}.pt"
-          torch.save(data, os.path.join(output_dir, dataset_name, save_name))
-   
-  preprocessing_info['success_demo'] = count_success
-  preprocessing_info['non_success_demo'] = count_nonsuccess
-
+    data = {"z_obs": z_obs.half(), # saving in float16 to save space
+            "z_text": z_text.half(), # saving in float16 to save space
+            "joint_states": torch.from_numpy(joints_states_padded).float(),
+            "actions": torch.from_numpy(actions_padded).float(),
+            }
+  
+    # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'ù
+    save_name = f'{task_name}.pt'
+    torch.save(data, os.path.join(output_dir, dataset_name, task_id, save_name))
+  
    # Saving the correspondance map in json file
-  with open(os.path.join(output_dir, dataset_name, 'preprocessing_info.json'), 'w') as f:
+  with open(os.path.join(output_dir, dataset_name, task_id, 'preprocessing_info.json'), 'w') as f:
     json.dump(preprocessing_info, f)
    
 

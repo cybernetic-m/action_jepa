@@ -22,8 +22,8 @@ from utils import preprocess_data, resample_data
 import torch
 import json
 import os
-#from model.modules.CLIPEncoder import CLIPEncoder
-#from model.modules.VJEPAEncoder import VJEPAEncoder
+from modules.CLIPEncoder import CLIPEncoder
+from modules.VJEPAEncoder import VJEPAEncoder
 import glob
 
 if __name__ == "__main__":
@@ -57,21 +57,26 @@ if __name__ == "__main__":
         files = sorted(glob.glob(os.path.join(f"{datasets_dir}/{dataset_name}", "*.hdf5")))
 
         for i, file_path in enumerate(files):
-            print(f"\n[START] Starting resampling\n Task {i}: {os.path.basename(file_path)}")
-            resample_data(
-                        hdf5_path = file_path, 
-                        output_dir = resample_data_dir, 
-                        task_id = i, 
-                        task_suite_name = dataset_name)
+            data = sorted(glob.glob(os.path.join(f"{resample_data_dir}/{dataset_name}/{i}/data", "*.pt")))
+            if len(data) < 50:
+
+                print(f"\n[START] Starting resampling\n Task {i}: {os.path.basename(file_path)}")
+                resample_data(
+                            hdf5_path = file_path, 
+                            output_dir = resample_data_dir, 
+                            task_id = i, 
+                            task_suite_name = dataset_name)
+            else:
+                print(f"\n Task {i}: {os.path.basename(file_path)} just completed before!")
 
         print("\n[END] All tasks resampled")
-    
+        
     
     # PART OF EXTRACT FEATURES FOR DATA
-
-    libero_paths = [f"{datasets_dir}/{task}/*.hdf5" for task in selected_tasks]
-
-    '''
+    
+    # A list of the type: ['../resampled_data/libero_goal/2', '../resampled_data/libero_goal/3', '../resampled_data/libero_goal/9' ...]
+    data_paths = sorted([f"{d}" for task in selected_tasks for d in glob.glob(os.path.join(resample_data_dir, task, "*")) if os.path.isdir(d)])
+    
     checkpoints_path = "../checkpoints"
     # Path for all the models
     vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
@@ -79,19 +84,18 @@ if __name__ == "__main__":
 
     vision_backbone = VJEPAEncoder(model_path=vjepa_path, frozen=True, device=device)
     language_backbone = CLIPEncoder(model_path=clip_path, frozen=True, device=device)
-    '''
     
-    for path in libero_paths:
-
-        '''
+    
+    for path in data_paths:
+        
         preprocess_data(
-                                hdf5_path=path,
+                                data_dir=path,
                                 output_dir=processed_data_dir, 
                                 vision_backbone = vision_backbone,
                                 language_backbone = language_backbone,
                                 num_frames = NUM_FRAMES,
                                 action_dim = 7,
                                 )
-        '''
+
 
 
