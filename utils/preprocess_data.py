@@ -9,16 +9,14 @@ import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.abspath(os.path.join(script_dir, "../"))
 
-libero_path = os.path.join(root_path, "LIBERO")
 model_path = os.path.join(root_path, "model")
-if libero_path not in sys.path:
-    sys.path.insert(0, libero_path)
+
 if model_path not in sys.path:
     sys.path.insert(0, model_path)
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
-from utils import preprocess_data, resample_data
+from utils import preprocess_data
 import torch
 import json
 import os
@@ -50,28 +48,6 @@ if __name__ == "__main__":
     else:
         selected_tasks = [DATASET_TYPE]
 
-    # PART OF RESAMPLING DATA 
-
-    for dataset_name in selected_tasks:
-        
-        files = sorted(glob.glob(os.path.join(f"{datasets_dir}/{dataset_name}", "*.hdf5")))
-
-        for i, file_path in enumerate(files):
-            data = sorted(glob.glob(os.path.join(f"{resample_data_dir}/{dataset_name}/{i}/data", "*.pt")))
-            if len(data) < 50:
-
-                print(f"\n[START] Starting resampling\n Task {i}: {os.path.basename(file_path)}")
-                resample_data(
-                            hdf5_path = file_path, 
-                            output_dir = resample_data_dir, 
-                            task_id = i, 
-                            task_suite_name = dataset_name)
-            else:
-                print(f"\n Task {i}: {os.path.basename(file_path)} just completed before!")
-
-        print("\n[END] All tasks resampled")
-        
-    
     # PART OF EXTRACT FEATURES FOR DATA
     
     # A list of the type: ['../resampled_data/libero_goal/2', '../resampled_data/libero_goal/3', '../resampled_data/libero_goal/9' ...]
