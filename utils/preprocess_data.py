@@ -41,7 +41,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     NUM_FRAMES = config['num_frames']
-    DATASET_TYPE = config['dataset_type']
+    DATASET_TYPE = config['dataset_type_preprocessing']
 
     if DATASET_TYPE == "all":
         selected_tasks = ["libero_10", "libero_90", "libero_spatial", "libero_goal", "libero_object"]

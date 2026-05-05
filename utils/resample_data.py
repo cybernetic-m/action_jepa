@@ -28,7 +28,7 @@ if __name__ == "__main__":
     with open('../config.json', 'r') as f:
         config = json.load(f)
 
-    DATASET_TYPE = config['dataset_type']
+    DATASET_TYPE = config['dataset_type_preprocessing']
 
     if DATASET_TYPE == "all":
         selected_tasks = ["libero_10", "libero_90", "libero_spatial", "libero_goal", "libero_object"]
