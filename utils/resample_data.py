@@ -31,7 +31,7 @@ if __name__ == "__main__":
     DATASET_TYPE = config['dataset_type_preprocessing']
 
     if DATASET_TYPE == "all":
-        selected_tasks = ["libero_10", "libero_90", "libero_spatial", "libero_goal", "libero_object"]
+        selected_tasks = ["libero_spatial", "libero_goal", "libero_object"]#, "libero_10", "libero_90"] 
     else:
         selected_tasks = [DATASET_TYPE]
 

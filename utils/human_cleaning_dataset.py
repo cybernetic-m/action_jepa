@@ -17,6 +17,7 @@ import cv2
 import imageio
 import shutil
 import json
+from utils import draw_text
 
 user_choice = None
 
@@ -55,6 +56,8 @@ def manual_cleaning_dataset(resampled_data_dir):
                 current_info = json.load(f)
         if 'manual_cleaning_stats' not in current_info:
             current_info['manual_cleaning_stats'] = {'success': 0, 'fail': 0}
+
+        text_instruction = current_info.get('text_instruction', "Goal: Task execution")
                     
         gif_task_path = os.path.join(task_path, 'gifs') # the path of the gifs to load
         # Creating a directory where to store fail demo
@@ -93,10 +96,22 @@ def manual_cleaning_dataset(resampled_data_dir):
 
                     display = cv2.resize(frame, (512, 512))
                     
-                    cv2.rectangle(display, (0, 430), (512, 512), (50, 50, 50), -1)
+                    cv2.rectangle(display, (0, 370), (512, 512), (50, 50, 50), -1)
 
                     s_count = current_info['manual_cleaning_stats']['success']
                     f_count = current_info['manual_cleaning_stats']['fail']
+
+                    draw_text(
+                        img = display,
+                        text = f"Goal: {text_instruction}",
+                        position = (15, 385),
+                        font = cv2.FONT_HERSHEY_SIMPLEX,
+                        font_scale = 0.45,
+                        color = (255, 255, 255),
+                        color_border = (0, 0, 0),
+                        thickness = 1,
+                        max_width = 480
+                    )
 
                     # Counter visualization
                     cv2.putText(display, f"Total Success: {s_count}", (50, 425), 
@@ -121,8 +136,12 @@ def manual_cleaning_dataset(resampled_data_dir):
                     cv2.imshow("Dataset Reviewer", display)
 
                     key = cv2.waitKey(30) & 0xFF
-                    if key == ord('s'): user_choice = 'success'
-                    elif key == ord('f'): user_choice = 'fail'
+                    if key == ord('s'): 
+                        user_choice = 'success'
+                        print(f" -> SAVED as SUCCESS")
+                    elif key == ord('f'): 
+                        user_choice = 'fail'
+                        print(f" -> MARKED as FAIL")
                     elif key == ord('q'): 
                         cv2.destroyAllWindows()
                         return 

@@ -51,7 +51,7 @@ def draw_text(img, text, position, font, font_scale, color, color_border, thickn
         current_line = line
      else:
         lines.append(line)
-        current_line = word + ""
+        current_line = word + " "
 
   lines.append(current_line) # for the last line is needed
 
@@ -59,9 +59,9 @@ def draw_text(img, text, position, font, font_scale, color, color_border, thickn
   
   for line in lines:
     
-    cv2.putText(img, text, (x,y), font, font_scale, color_border, thickness+2) # Border
-    cv2.putText(img, text, (x,y), font, font_scale, color, thickness)
-    y += int(20 * font_scale + 10) # y spaces between lines
+    cv2.putText(img, line, (x,y), font, font_scale, color_border, thickness+2) # Border
+    cv2.putText(img, line, (x,y), font, font_scale, color, thickness)
+    y += int(20 * font_scale + 5) # y spaces between lines
 
 def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
 
@@ -119,6 +119,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
         # problem_info is a dict of the type .. that contain 'language_instruction'
         problem_info = json.loads(f['data'].attrs['problem_info'])
         text_instruction = problem_info['language_instruction'] 
+        preprocessing_info['text_instruction'] = text_instruction 
         
         demo_data = f['data']
         demo_keys = sorted(list(demo_data.keys()))
