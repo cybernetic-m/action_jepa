@@ -18,6 +18,7 @@ import imageio
 import shutil
 import json
 from utils import draw_text
+import numpy as np
 
 user_choice = None
 
@@ -37,8 +38,13 @@ def manual_cleaning_dataset(resampled_data_dir):
     # this contain paths of the type [./resampled_data_dir/libero_goal/0, ...., ./resampled_data_dir/libero_spatial/1]
     task_paths = sorted(glob.glob(os.path.join(resampled_data_dir, "*", "*")))
 
-    cv2.namedWindow("Dataset Reviewer")
-    cv2.setMouseCallback("Dataset Reviewer", mouse_callback)
+    cv2.namedWindow("Robot View")
+    cv2.namedWindow("User Choice")
+
+    cv2.moveWindow("Robot View", 100, 100) 
+    cv2.moveWindow("User Choice", 620, 100)
+
+    cv2.setMouseCallback("User Choice", mouse_callback)
     
     for task_path in task_paths:
 
@@ -91,49 +97,34 @@ def manual_cleaning_dataset(resampled_data_dir):
             while user_choice is None:
                 for frame in frames:
 
-                    current_idx = list(demo_files).index(demo) + 1 
+                    current_idx = demo_files.index(demo) + 1 
                     remaining = total_demos - current_idx
 
-                    display = cv2.resize(frame, (512, 512))
-                    
-                    cv2.rectangle(display, (0, 370), (512, 512), (50, 50, 50), -1)
+                    # 1. FINESTRA ROBOT (PULITA)
+                    robot_display = cv2.resize(frame, (1024, 1024))
+                    cv2.imshow("Robot View", robot_display)
 
+                    # 2. FINESTRA INFO
+                    info_display = np.full((300, 512, 3), (45, 45, 45), dtype=np.uint8)
+                                    
+                    # Demo Name e Progresso
+                    cv2.putText(info_display, f"Demo: {demo_name}", (20, 110), 1, 0.9, (200, 200, 200), 1)
+                    cv2.putText(info_display, f"Progress: {current_idx}/{total_demos} ({remaining} left)", (20, 135), 1, 0.9, (255, 255, 255), 1)
+                    
+                    # Stats
                     s_count = current_info['manual_cleaning_stats']['success']
                     f_count = current_info['manual_cleaning_stats']['fail']
+                    cv2.putText(info_display, f"Total Success: {s_count}", (20, 170), 1, 1, (0, 255, 0), 1)
+                    cv2.putText(info_display, f"Total Fail: {f_count}", (280, 170), 1, 1, (0, 0, 255), 1)
 
-                    draw_text(
-                        img = display,
-                        text = f"Goal: {text_instruction}",
-                        position = (15, 385),
-                        font = cv2.FONT_HERSHEY_SIMPLEX,
-                        font_scale = 0.45,
-                        color = (255, 255, 255),
-                        color_border = (0, 0, 0),
-                        thickness = 1,
-                        max_width = 480
-                    )
+                    # Pulsanti
+                    cv2.rectangle(info_display, (50, 200), (230, 260), (0, 150, 0), -1)
+                    cv2.putText(info_display, "SUCCESS (S)", (70, 240), 1, 1.2, (255, 255, 255), 2)
+                    
+                    cv2.rectangle(info_display, (280, 200), (460, 260), (0, 0, 150), -1)
+                    cv2.putText(info_display, "FAIL (F)", (325, 240), 1, 1.2, (255, 255, 255), 2)
 
-                    # Counter visualization
-                    cv2.putText(display, f"Total Success: {s_count}", (50, 425), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                    cv2.putText(display, f"Total Fail: {f_count}", (280, 425), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-                    
-                    cv2.putText(display, f"Demo {current_idx} of {total_demos} ({remaining} left)", (10, 400), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                    
-                    # SUCCESS (Green)
-                    cv2.rectangle(display, (50, 440), (230, 490), (0, 150, 0), -1)
-                    cv2.putText(display, "Success (S)", (85, 475), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                    
-                    # FAIL (Red)
-                    cv2.rectangle(display, (280, 440), (460, 490), (0, 0, 150), -1)
-                    cv2.putText(display, "Fail (F)", (300, 475), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                    
-                    cv2.putText(display, f" {demo_name}", (10, 30), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-
-                    cv2.imshow("Dataset Reviewer", display)
+                    cv2.imshow("User Choice", info_display)
 
                     key = cv2.waitKey(30) & 0xFF
                     if key == ord('s'): 

@@ -67,10 +67,14 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
 
   benchmark_dict = benchmark.get_benchmark_dict() # dictionary of the type {"<task_suite_name>": <task_suite_class>} (Ex. "libero_spatial": <class 'libero.libero.benchmark.LIBERO_SPATIAL'>)
   task_suite = benchmark_dict[task_suite_name]() # task suite is a class that represents a set of different tasks, we'll retrieve a specific task with the task_id
-  task = task_suite.get_task(task_id) # task is the object with all the information about the specific task
+  
+  # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
+  task_name = os.path.basename(hdf5_path).replace("_demo.hdf5","")
+  task = task_suite.get_task(task_id)
   task_name = task.name # the name of the task as "KITCHEN_SCENE_1_put_the_black_bowl_at_the_front_on_the_coffee_table"  
   task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
   
+
   # Args for environment initialization
   env_args = {
       "bddl_file_name": task_bddl_file, # path of the BDDL file
@@ -108,14 +112,15 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
     if not hdf5_path:
       raise FileNotFoundError(f"No file founded in {hdf5_path}. Please download the LIBERO Dataset through the command 'python benchmark_scripts/download_libero_datasets.py'")
     
+    
+
     # Dictionary we will save in json to remember correspondances between tasks and name id that we save
     preprocessing_info = {}
     
-    # From the entire path name ./path_to_file1/file1.hdf5 take only the final part file1.hdf5 eliminating .hdf5 
-    task_name = os.path.basename(hdf5_path).replace(".hdf5","")
     preprocessing_info[task_id] = task_name # saving the correspondances (ex. '0': 'KITCHEN_SCENE3_turn...')
 
     with h5py.File(hdf5_path, 'r') as f:
+        
         # problem_info is a dict of the type .. that contain 'language_instruction'
         problem_info = json.loads(f['data'].attrs['problem_info'])
         text_instruction = problem_info['language_instruction'] 
@@ -124,7 +129,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
         demo_data = f['data']
         demo_keys = sorted(list(demo_data.keys()))
         
-        for demo_id in tqdm(demo_keys, desc=f"{task_name}"):
+        for demo_id in tqdm(demo_keys, desc=f"Task {task_id}: {task_name}"):
           
           env.reset()
           
