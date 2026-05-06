@@ -24,13 +24,11 @@ user_choice = None
 
 def mouse_callback(event, x, y, flags, param):
     global user_choice
-
-    # event is true when you click the left button of the mouse
-    if event==cv2.EVENT_LBUTTONDOWN:
-        if 50<=x<=230 and 440<=y<=490:
-            user_choice='success'
-        elif 280<=x<=460 and 440<=y<=490:
-            user_choice='fail'
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if 50 <= x <= 230 and 260 <= y <= 330:
+            user_choice = 'success'
+        elif 280 <= x <= 460 and 260 <= y <= 330:
+            user_choice = 'fail'
 
 
 def manual_cleaning_dataset(resampled_data_dir):
@@ -47,6 +45,8 @@ def manual_cleaning_dataset(resampled_data_dir):
     cv2.setMouseCallback("User Choice", mouse_callback)
     
     for task_path in task_paths:
+        
+        dataset_name = os.path.basename(os.path.dirname(task_path))
 
         history_path = os.path.join(task_path, 'cleaning.json')
         if os.path.exists(history_path):
@@ -105,24 +105,36 @@ def manual_cleaning_dataset(resampled_data_dir):
                     cv2.imshow("Robot View", robot_display)
 
                     # 2. FINESTRA INFO
-                    info_display = np.full((300, 512, 3), (45, 45, 45), dtype=np.uint8)
+                    info_display = np.full((380, 512, 3), (45, 45, 45), dtype=np.uint8)
+
+                    cv2.putText(info_display, f"DATASET: {dataset_name.upper()}", (20, 35), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
                                     
                     # Demo Name e Progresso
-                    cv2.putText(info_display, f"Demo: {demo_name}", (20, 110), 1, 0.9, (200, 200, 200), 1)
-                    cv2.putText(info_display, f"Progress: {current_idx}/{total_demos} ({remaining} left)", (20, 135), 1, 0.9, (255, 255, 255), 1)
+                    cv2.putText(info_display, f"Demo: {demo_name}", (20, 160), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+
+                    cv2.putText(info_display, f"Progress: {current_idx}/{total_demos} ({remaining} left)", (20, 195), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                     
                     # Stats
                     s_count = current_info['manual_cleaning_stats']['success']
                     f_count = current_info['manual_cleaning_stats']['fail']
-                    cv2.putText(info_display, f"Total Success: {s_count}", (20, 170), 1, 1, (0, 255, 0), 1)
-                    cv2.putText(info_display, f"Total Fail: {f_count}", (280, 170), 1, 1, (0, 0, 255), 1)
+                    cv2.putText(info_display, f"SUCCESS: {s_count}", (20, 240), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+                    cv2.putText(info_display, f"FAIL: {f_count}", (280, 240), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
                     # Pulsanti
-                    cv2.rectangle(info_display, (50, 200), (230, 260), (0, 150, 0), -1)
-                    cv2.putText(info_display, "SUCCESS (S)", (70, 240), 1, 1.2, (255, 255, 255), 2)
-                    
-                    cv2.rectangle(info_display, (280, 200), (460, 260), (0, 0, 150), -1)
-                    cv2.putText(info_display, "FAIL (F)", (325, 240), 1, 1.2, (255, 255, 255), 2)
+                    cv2.rectangle(info_display, (50, 260), (230, 330), (0, 150, 0), -1)
+                    cv2.putText(info_display, "SUCCESS (S)", (65, 305), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+                    # FAIL BUTTON
+                    cv2.rectangle(info_display, (280, 260), (460, 330), (0, 0, 150), -1)
+                    cv2.putText(info_display, "FAIL (F)", (320, 305), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
                     cv2.imshow("User Choice", info_display)
 
@@ -154,7 +166,7 @@ def manual_cleaning_dataset(resampled_data_dir):
             with open(info_path, 'w') as f:
                 json.dump(current_info, f, indent=4)
         
-        cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 
 
 
