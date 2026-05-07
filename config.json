@@ -8,7 +8,8 @@
     "lambda_actor": 1.0,
     "lambda_refiner": 1.0,
     "dataset_type_training": "libero_goal",
-    "dataset_type_preprocessing": "all",
+    "dataset_type_preprocessing": "libero_goal",
+    "chunk_size": 100,
     "policy": "transformer",
     "mixed_precision": true,
     "num_workers": 11

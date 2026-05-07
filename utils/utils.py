@@ -208,7 +208,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
      env.close()
      del env
 
-def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None):
+def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, chunk_size = 30):
    
   # Create the output directory if it does not exist where to save the .pt file
   # The data_dir is a path of the type ../resampled_data/libero_goal/1 where we extract "libero_goal" as dataset_name and '1' as task_id
@@ -224,7 +224,6 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
    
   # We'll preprocess the dataset using the model backbones to speed up the training (because model backbones are frozen during training)
   device = vision_backbone.device
-  print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
   
   # Reading the old file to store the correspondance between task_id and task instruction
   with open(os.path.join(data_dir, 'info.json'), encoding='utf-8') as f:
@@ -240,6 +239,10 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
         "num_frames": num_frames
     }
 
+  # Saving the correspondance map in json file
+  with open(os.path.join(output_dir, dataset_name, task_id, 'preprocessing_info.json'), 'w') as f:
+    json.dump(preprocessing_info, f)
+
   # Preprocessing using the CLIP ENCODER backbone if needed
   with torch.no_grad():
     z_tokens = language_backbone.tokenization(text_instruction)
@@ -249,7 +252,20 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
   for file_path in tqdm(files, desc=f"Task ID: {task_id}"):
     
     # From the entire path name ./path_to_file1/file1.pt take only the final part file1.pt eliminating .pt
-    task_name = os.path.basename(file_path).replace(".pt","")
+    demo_name = os.path.basename(file_path).replace(".pt","")
+    save_path = os.path.join(output_dir, dataset_name, task_id, f'{demo_name}.pt')
+
+    # Check if some files exist yet for previous run of preprocess. If it exist, try to load and continue the loop to other demo
+    # Otherwise remove it and recompute the preprocessing for it
+    if os.path.exists(save_path):
+       try:
+            torch.load(save_path, weights_only=True)
+            print(f"File {demo_name} just exist! Continue")
+            continue 
+       except (EOFError, RuntimeError, Exception):
+            print(f"File {demo_name} corrupted, computing feature again...")
+            os.remove(save_path) 
+       continue
     
     # Loading all the important informations
     resampled_data = torch.load(file_path, weights_only=False)
@@ -282,21 +298,21 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
     with torch.no_grad():
       # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
       z_frames = vision_backbone.preprocess_frames(frames_padded)
+      z_obs = vision_backbone(z_frames).cpu()
       
       # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
-      chunk_size = 30 
-      z_obs_chunks = []
+      #z_obs_chunks = []
 
-      for i in range(0, z_frames.shape[0], chunk_size):
+      #for i in range(0, z_frames.shape[0], chunk_size):
         
-        batch_chunk = z_frames[i : i + chunk_size].to(device)
+      #  batch_chunk = z_frames[i : i + chunk_size].to(device)
         
-        z_chunk = vision_backbone(batch_chunk).cpu() 
-        z_obs_chunks.append(z_chunk)
+      #  z_chunk = vision_backbone(batch_chunk).cpu() 
+        #z_obs_chunks.append(z_chunk)
         
-        del batch_chunk
+    #    del batch_chunk
 
-    z_obs = torch.cat(z_obs_chunks, dim=1)
+    #z_obs = torch.cat(z_obs_chunks, dim=1)
 
     # Cutting actions and states that exceed the dimensione of z_obs steps
     steps = z_obs.shape[1] // 256  
@@ -320,12 +336,7 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
             }
   
     # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'ù
-    save_name = f'{task_name}.pt'
-    torch.save(data, os.path.join(output_dir, dataset_name, task_id, save_name))
-  
-   # Saving the correspondance map in json file
-  with open(os.path.join(output_dir, dataset_name, task_id, 'preprocessing_info.json'), 'w') as f:
-    json.dump(preprocessing_info, f)
+    torch.save(data, save_path)
    
 
 def demo_animator(demo_pt_path):

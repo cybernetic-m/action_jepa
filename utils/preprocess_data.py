@@ -42,9 +42,10 @@ if __name__ == "__main__":
 
     NUM_FRAMES = config['num_frames']
     DATASET_TYPE = config['dataset_type_preprocessing']
+    CHUNK_SIZE = config['chunk_size']
 
     if DATASET_TYPE == "all":
-        selected_tasks = ["libero_spatial", "libero_goal", "libero_object"]#, "libero_10", "libero_90"]
+        selected_tasks = ["libero_spatial", "libero_goal", "libero_object", "libero_10", "libero_90"]
     else:
         selected_tasks = [DATASET_TYPE]
 
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     
     
     for path in data_paths:
-        
+        print(f"Preprocessing using feature extraction with {vision_backbone.__class__.__name__} vision backbone and {language_backbone.__class__.__name__} language backbone on device: {device}")
         preprocess_data(
                                 data_dir=path,
                                 output_dir=processed_data_dir, 
@@ -71,6 +72,7 @@ if __name__ == "__main__":
                                 language_backbone = language_backbone,
                                 num_frames = NUM_FRAMES,
                                 action_dim = 7,
+                                chunk_size = CHUNK_SIZE
                                 )
 
 
