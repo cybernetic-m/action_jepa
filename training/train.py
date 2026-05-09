@@ -33,17 +33,17 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
     # Example: if we start with 1e-4, the linear warmup start from [start_factor*lr] => 0.1*1e-4 = 1e-5 and linearly arrive to [end_factor*lr] 2*1e-4 = 1e-4
     # While in the cosine decay starting from 1e-4 it decrase for T_max epochs until reaching eta_min
     # The SequentialLR after milestones epochs change the scheduler between the two schedulers
-    if model.policy == 'transformer':
-        warmup_epochs = 5
-        warmup_scheduler = opti.LinearLR(
-            optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs
-        )
-        decay_scheduler = opti.CosineAnnealingLR(
-            optimizer, T_max=(num_epochs - warmup_epochs), eta_min=1e-6
-        )
-        scheduler = opti.SequentialLR(
-            optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_epochs]
-        )
+    
+    warmup_epochs = 20
+    warmup_scheduler = opti.LinearLR(
+        optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs
+    )
+    decay_scheduler = opti.CosineAnnealingLR(
+        optimizer, T_max=(num_epochs - warmup_epochs), eta_min=1e-6
+    )
+    scheduler = opti.SequentialLR(
+        optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_epochs]
+    )
     current_lr = optimizer.param_groups[0]['lr']
     
     for epoch in range(num_epochs):
@@ -79,8 +79,7 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
         train_history.append(train_metrics)
         val_history.append(val_metrics)
 
-        if model.policy == 'transformer':
-            scheduler.step()
+        scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
 
         print("-" * 80)

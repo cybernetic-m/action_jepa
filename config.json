@@ -1,16 +1,17 @@
 {
-    "num_epochs": 100,
-    "num_frames": 4,
-    "batch_size": 16,
+    "num_epochs": 150,
+    "num_frames": 2,
+    "batch_size": 32,
     "max_length": 77,
     "preprocessing_with_backbone": true,
     "learning_rate": 1e-4,
     "lambda_actor": 1.0,
     "lambda_refiner": 1.0,
-    "dataset_type_training": "libero_goal",
+    "datasets": ["libero_goal"],
+    "task_ids": [6],
     "dataset_type_preprocessing": "libero_goal",
     "chunk_size": 100,
-    "policy": "transformer",
+    "policy": "mlp",
     "mixed_precision": true,
-    "num_workers": 11
+    "num_workers": 8
 }

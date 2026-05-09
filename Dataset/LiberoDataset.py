@@ -24,7 +24,7 @@ class LiberoDataset(Dataset):
         self.num_patches = 256
         
         for task in selected_tasks:
-            task_path = os.path.join(data_dir, task, "*.pt") # the generic path of the type "./processed_data/libero_10/*.pt"
+            task_path = os.path.join(data_dir, task, "6", "*.pt") # the generic path of the type "./processed_data/libero_10/*.pt"
             # with glob.glob we create a list of path ['.../task_0_demo_0', '.../task_0_demo_1', ...], one list for all the tasks
             # with extend we do not append list of lists but create a unique list for all the tasks paths
             files_found = sorted(glob.glob(task_path))
@@ -34,7 +34,9 @@ class LiberoDataset(Dataset):
 
         for data_idx, path in enumerate(self.file_paths):
             data = torch.load(path, map_location='cpu', weights_only=True)
+            
             N_tokens = data['z_obs'].shape[1] #if use_features else data['frames'].shape[0] # number of steps in that demo or number of tubelets if feature extracted
+            print(N_tokens)
             T_demo = N_tokens // self.num_patches
             #if self.use_features:
             for start_idx in range(0, T_demo - self.T_window +1):

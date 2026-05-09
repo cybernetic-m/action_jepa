@@ -11,12 +11,12 @@ class TransformerActionJEPA(nn.Module):
                  vjepa_encoder_path, 
                  vjepa_predictor_path,
                  clip_model_path,
-                 num_frames=16,
+                 num_frames=2,
                  vision_dim = 1408,
                  language_dim=768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 512,
+                 embed_dim = 1024,
                  use_backbone = True,
                  frozen_backbone = True,
                  device="cuda"):
@@ -62,9 +62,9 @@ class TransformerActionJEPA(nn.Module):
                 d_model=embed_dim, 
                 nhead=8, 
                 dim_feedforward=2048, 
-                dropout=0.1, 
+                dropout=0.2, 
                 batch_first = True),
-            num_layers = 3
+            num_layers = 5
                 )
         
         self.refiner = nn.TransformerDecoder(
@@ -72,9 +72,9 @@ class TransformerActionJEPA(nn.Module):
                 d_model=embed_dim, 
                 nhead=8, 
                 dim_feedforward=2048, 
-                dropout=0.1, 
+                dropout=0.2, 
                 batch_first = True),
-            num_layers = 3
+            num_layers = 5
                 )
 
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[256, 128], output_dim=action_dim)
