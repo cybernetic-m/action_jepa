@@ -141,16 +141,14 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
             # Taking the data from the batch
             frames_current = batch['frames_current'].to(device)
             frames_next = batch['frames_next'].to(device)
-            action = batch['actions'].to(device)
-
-            with torch.no_grad():
-                z_frames_current = vjepa_encoder.preprocess_frames(frames_current)
-                z_obs_current = vjepa_encoder(z_frames_current)
-
-                z_frames_next = vjepa_encoder.preprocess_frames(frames_next)
-                z_obs_next = vjepa_encoder(z_frames_next)
+            action = batch['action'].to(device).unsqueeze(1)
 
             with autocast(device_type='cuda', enabled=(device == 'cuda')):
+
+                with torch.no_grad():
+                    z_obs_current = vjepa_encoder(frames_current)
+                    z_obs_next = vjepa_encoder(frames_next)
+
                 # Making the predictions
                 z_pred, _, _ = predictor(z_obs_current, action)
 

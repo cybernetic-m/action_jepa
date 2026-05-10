@@ -1,0 +1,10 @@
+{
+    "num_epochs": 20,
+    "num_frames": 2,
+    "batch_size": 16,
+    "learning_rate": 1e-4,
+    "datasets": ["libero_goal", "libero_spatial", "libero_goal", "libero_10"],
+    "task_ids": [0],
+    "mixed_precision": true,
+    "num_workers": 10
+}

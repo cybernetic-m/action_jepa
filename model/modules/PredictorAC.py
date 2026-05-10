@@ -61,8 +61,9 @@ class PredictorAC(nn.Module):
             mask = build_action_block_causal_attention_mask(
             self.T, self.grid_h, self.grid_w, add_tokens=self.cond_tokens
             )
-            self.predictor.predictor.attn_mask = mask.to(device)
-            self.predictor.predictor.is_frame_causal = True
+
+            self.predictor.attn_mask = mask.to(device)
+            self.predictor.is_frame_causal = True
         else:
             raise FileNotFoundError(f"V-JEPA AC Predictor not found in {model_path}. Run 'python download_models.py' to download it!")
         

@@ -9,6 +9,8 @@ import pandas as pd
 
 def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, scaler):
     
+    print(f"Scaler status -> {'ACTIVE (Mixed Precision)' if scaler is not None else 'INACTIVE (FP32)'}")
+
     # time stamp for creating a directory of the type ./results/2026_04_16__15_45
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M")
     training_dir_path = os.path.join(results_dir_path, timestamp)
@@ -131,7 +133,10 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     return training_dir_path
 
 
-def train_predictor(predictor, vjepa_encoder, train_loader, val_loader, loss_fn, num_epochs, results_dir_path, optimizer, device, scaler):
+def train_predictor(predictor, vjepa_encoder, train_loader, val_loader, loss_fn, num_epochs, config, results_dir_path, optimizer, device, scaler):
+
+
+    print(f"Scaler status -> {'ACTIVE (Mixed Precision)' if scaler is not None else 'INACTIVE (FP32)'}")
 
     # time stamp for creating a directory of the type ./results/predictor/2026_04_16__15_45
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M")
@@ -140,6 +145,14 @@ def train_predictor(predictor, vjepa_encoder, train_loader, val_loader, loss_fn,
 
     predictor.train()
     vjepa_encoder.eval()
+
+    config_dict = {
+        'hyperparameters': config,
+    }
+
+    json_save_path = os.path.join(training_dir_path, "experiment_config.json")
+    with open(json_save_path, "w") as f:
+        json.dump(config_dict, f, indent=4)
 
     best_vloss = 100000000 
     best_epoch = 1
