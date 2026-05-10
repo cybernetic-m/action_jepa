@@ -15,15 +15,20 @@ import torch
 import numpy as np
 import torch.nn as nn
 from src.models.ac_predictor import VisionTransformerPredictorAC
+from src.models.utils.modules import build_action_block_causal_attention_mask
 
 class PredictorAC(nn.Module):
-    def __init__(self, model_path, frozen=True, device="cpu"):
+    def __init__(self, model_path, num_frames, grid_h = 16, grid_w = 16, cond_tokens = 2, frozen=True, device="cpu"):
         super(PredictorAC, self).__init__()
 
         # Setting the device (ex. cuda or cpu)
         self.device = device
-
         self.frozen = frozen
+        self.num_frames = num_frames
+        self.grid_h = grid_h
+        self.grid_w = grid_w
+        self.cond_tokens = cond_tokens
+        self.T = self.num_frames // 2           
         
         # load the model weights from the local path, setting local_files_only to True to avoid trying to download the weights from Hugging Face if they are not found at the local path
         if os.path.exists(model_path):
@@ -51,27 +56,34 @@ class PredictorAC(nn.Module):
                     new_state_dict[k] = v
 
             self.predictor.load_state_dict(state_dict=new_state_dict)
+
+            # Build the attention mask
+            mask = build_action_block_causal_attention_mask(
+            self.T, self.grid_h, self.grid_w, add_tokens=self.cond_tokens
+            )
+            self.predictor.predictor.attn_mask = mask.to(device)
+            self.predictor.predictor.is_frame_causal = True
         else:
             raise FileNotFoundError(f"V-JEPA AC Predictor not found in {model_path}. Run 'python download_models.py' to download it!")
         
-        # Freeze the V-JEPA 2 image encoder parameters 
+        # Freeze the weights
         if self.frozen:
             for param in self.predictor.parameters():
                 param.requires_grad = False
-            self.predictor.eval() # Put the encoder in evaluation model
+            self.predictor.eval() 
         else:
             for param in self.predictor.parameters():
                 param.requires_grad = True
-            self.predictor.train() # Put the encoder in evaluation model
+            self.predictor.train() 
     
 
     def forward(self, x, actions, states = None, extrinsics = None):
 
         B, N, D = x.shape
-        T = N // 256
+        #T = N // 256
         
         if states is None:
-            states = torch.zeros(B, T, 1, 1024, device=x.device)
+            states = torch.zeros(B, self.T, 1, 1024, device=x.device)
 
         x, action_features, proprio_features = self.predictor(x, actions, states, extrinsics)
         

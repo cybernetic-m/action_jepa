@@ -13,12 +13,12 @@ class MLPActionJEPA(nn.Module):
                  vjepa_encoder_path, 
                  vjepa_predictor_path,
                  clip_model_path,
-                 num_frames=16,
+                 num_frames=2,
                  vision_dim = 1408,
                  language_dim=768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 1024,
+                 embed_dim = 2048,
                  use_backbone = True,
                  frozen_backbone = True,
                  device="cuda"):
@@ -35,13 +35,9 @@ class MLPActionJEPA(nn.Module):
         self.embed_dim = embed_dim
         self.policy = 'mlp'
         
-        if self.use_backbone:
-            self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
-            self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
-        else:
-            self.vision_backbone = None
-            self.language_backbone = None
-
+        self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
+        self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
+        
         self.predictor = PredictorAC(model_path=vjepa_predictor_path, device=device)
         self.T = self.num_frames // 2           
         self.grid_h = 16     
@@ -57,8 +53,8 @@ class MLPActionJEPA(nn.Module):
         self.joint_proj = nn.Linear(joint_dim, embed_dim)
         self.language_proj= nn.Linear(language_dim, embed_dim)
 
-        self.actor = MLP(input_dim=3*embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim)
-        self.refiner = MLP(input_dim=4*embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim)
+        self.actor = MLP(input_dim=3*embed_dim, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim, dropout=0.1)
+        self.refiner = MLP(input_dim=4*embed_dim, hidden_dims=[1024, 512, 256, 128], output_dim=action_dim, dropout=0.1)
 
 
     def preprocess_frames(self, vision_input):
@@ -82,8 +78,8 @@ class MLPActionJEPA(nn.Module):
             z_obs = vision_input.to(self.device) if torch.is_tensor(vision_input) else vision_input
             z_text = language_input.to(self.device) if torch.is_tensor(language_input) else language_input
 
-        if joint_input.dim() == 2:
-            joint_input = joint_input.unsqueeze(1) # Da [B, 7] a [B, 1, 7]
+        
+        joint_input = joint_input.unsqueeze(1) # Da [B, 7] a [B, 1, 7]
         
         B, N, D = z_obs.shape   # B = Batch, N = num of tokens, D = dim of each token
         

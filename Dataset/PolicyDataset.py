@@ -4,10 +4,10 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 
-class myDataset(Dataset):
+class PolicyDataset(Dataset):
     def __init__(self, data_dir, selected_tasks, task_ids):
 
-        super(myDataset, self).__init__()
+        super(PolicyDataset, self).__init__()
 
         self.file_paths = []   # a list of all the file paths (Ex. ./resampled_data/libero_10/task_0_demo_0.pt)
         

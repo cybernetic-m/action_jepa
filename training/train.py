@@ -1,12 +1,13 @@
 import torch
 import torch.optim.lr_scheduler as opti
 import json
-from training.one_epoch import one_epoch
+from training.one_epoch import one_epoch, one_epoch_pred
+from training.get_loss_weights import get_loss_weights
 import os
 from datetime import datetime
 import pandas as pd
 
-def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, scaler, lambda_actor = 1.0, lambda_refiner = 1.0):
+def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, scaler):
     
     # time stamp for creating a directory of the type ./results/2026_04_16__15_45
     timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M")
@@ -47,9 +48,11 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
     current_lr = optimizer.param_groups[0]['lr']
     
     for epoch in range(num_epochs):
+
+        lambda_actor, lambda_refiner = get_loss_weights(epoch=epoch, total_epoch=num_epochs)
         
         print(f"\n" + "="*30)
-        print(f"EPOCH: {epoch+1}/{num_epochs} - LR: {current_lr:.7f}")
+        print(f"EPOCH: {epoch+1}/{num_epochs} - LR: {current_lr:.7f} - LAMBDA ACTOR: {lambda_actor:.7f} - LAMBDA REFINER: {lambda_refiner:.7f}")
         print("="*30)
 
         # One epoch of training 
@@ -63,6 +66,8 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
                                   lambda_refiner = lambda_refiner
                                   )
         train_metrics['lr'] = current_lr    # saving also the current value of LR
+        train_metrics['lambda_actor'] = lambda_actor
+        train_metrics['lambda_refiner'] = lambda_refiner
 
         # One epoch of validation 
         val_metrics = one_epoch(model=model, 
@@ -124,6 +129,84 @@ def train(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, devic
         df_history.to_csv(csv_save_path)
 
     return training_dir_path
+
+
+def train_predictor(predictor, vjepa_encoder, train_loader, val_loader, loss_fn, num_epochs, results_dir_path, optimizer, device, scaler):
+
+    # time stamp for creating a directory of the type ./results/predictor/2026_04_16__15_45
+    timestamp = datetime.now().strftime("%Y_%m_%d__%H_%M")
+    training_dir_path = os.path.join(results_dir_path, timestamp)
+    os.makedirs(training_dir_path, exist_ok = True)
+
+    predictor.train()
+    vjepa_encoder.eval()
+
+    best_vloss = 100000000 
+    best_epoch = 1
+
+    train_history = []
+    val_history = []
+
+    for epoch in range(num_epochs):
+        
+        print(f"\n" + "="*30)
+        print(f"EPOCH: {epoch+1}/{num_epochs}")
+        print("="*30)
+
+        # One epoch of training 
+        train_metrics = one_epoch_pred(predictor=predictor, 
+                                       vjepa_encoder = vjepa_encoder,
+                                       dataloader=train_loader, 
+                                       optimizer=optimizer, 
+                                       loss_fn=loss_fn, 
+                                       device = device,
+                                       scaler=scaler,
+                                  )
+    
+        # One epoch of validation 
+        val_metrics = one_epoch_pred(predictor=predictor, 
+                                     vjepa_encoder = vjepa_encoder,
+                                     dataloader=val_loader, 
+                                     optimizer=optimizer, 
+                                     loss_fn=loss_fn, 
+                                     device = device,
+                                     scaler=scaler,
+                                     validation=True
+                                )
+        
+        train_history.append(train_metrics)
+        val_history.append(val_metrics)
+
+        print("-" * 80)
+
+        print(f"TRAIN      | Tot Loss: {train_metrics['loss']:.4f} | ")
+        print(f"VALIDATION | Tot Loss: {val_metrics['loss']:.4f} | ")
+        
+        print("-" * 80) 
+
+        current_vloss = val_metrics['loss']
+
+        if current_vloss < best_vloss:
+            best_vloss = current_vloss
+            best_epoch = epoch+1
+            model_save_path = os.path.join(training_dir_path, f"best_model.pth")
+            checkpoint = {
+                'epoch': best_epoch,
+                'model_state_dict': predictor.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }
+            torch.save(checkpoint, model_save_path)
+            print(f"Best model! Saving in: {model_save_path}")
+
+        df_train = pd.DataFrame(train_history).add_suffix('_train')
+        df_val = pd.DataFrame(val_history).add_suffix('_val')
+
+        df_history = pd.concat([df_train, df_val], axis=1)
+        df_history.index = range(1, len(df_history) + 1)
+        df_history.index.name = 'Epoch'
+
+        csv_save_path = os.path.join(training_dir_path, "metrics.csv")
+        df_history.to_csv(csv_save_path)
        
         
         

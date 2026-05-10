@@ -4,7 +4,7 @@ from model.modules.PredictorAC import PredictorAC
 from model.modules.CLIPEncoder import CLIPEncoder
 from model.modules.VJEPAEncoder import VJEPAEncoder
 from model.modules.MLP import MLP
-from src.models.utils.modules import build_action_block_causal_attention_mask
+#from src.models.utils.modules import build_action_block_causal_attention_mask
 
 class TransformerActionJEPA(nn.Module):
     def __init__(self, 
@@ -17,7 +17,6 @@ class TransformerActionJEPA(nn.Module):
                  action_dim = 7,
                  joint_dim = 7, 
                  embed_dim = 1024,
-                 use_backbone = True,
                  frozen_backbone = True,
                  device="cuda"):
         super(TransformerActionJEPA, self).__init__()
@@ -27,29 +26,26 @@ class TransformerActionJEPA(nn.Module):
         self.language_dim = language_dim
         self.action_dim = action_dim
         self.num_frames = num_frames
-        self.use_backbone = use_backbone
         self.frozen_backbone = frozen_backbone
         self.joint_dim = joint_dim
         self.embed_dim = embed_dim
         self.policy = 'transformer'
         
-        if self.use_backbone:
-            self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
-            self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
-        else:
-            self.vision_backbone = None
-            self.language_backbone = None
+    
+        self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
+        self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
+        
 
-        self.predictor = PredictorAC(model_path=vjepa_predictor_path, device=device)
-        self.T = self.num_frames // 2           
-        self.grid_h = 16     
-        self.grid_w = 16
-        self.cond_tokens = 2 
-        mask = build_action_block_causal_attention_mask(
-            self.T, self.grid_h, self.grid_w, add_tokens=self.cond_tokens
-        )
-        self.predictor.predictor.attn_mask = mask.to(device)
-        self.predictor.predictor.is_frame_causal = True
+        self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, device=device)
+        #self.T = self.num_frames // 2           
+        #self.grid_h = 16     
+        #self.grid_w = 16
+        #self.cond_tokens = 2 
+        #mask = build_action_block_causal_attention_mask(
+        #    self.T, self.grid_h, self.grid_w, add_tokens=self.cond_tokens
+        #)
+        #self.predictor.predictor.attn_mask = mask.to(device)
+        #self.predictor.predictor.is_frame_causal = True
 
         self.joint_proj = nn.Linear(joint_dim, embed_dim)
         self.language_proj = nn.Linear(language_dim, embed_dim)
@@ -77,8 +73,8 @@ class TransformerActionJEPA(nn.Module):
             num_layers = 5
                 )
 
-        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[256, 128], output_dim=action_dim)
-        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[256, 128], output_dim=action_dim)
+        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
+        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
 
     def preprocess_frames(self, vision_input):
         z_frames = self.vision_backbone.preprocess_frames(vision_input)
@@ -87,72 +83,57 @@ class TransformerActionJEPA(nn.Module):
     
     def preprocess_text(self, language_input):
         z_tokens = self.language_backbone.tokenization(language_input)
+        eot_pos = z_tokens['input_ids'].argmax(dim=-1)
         z_text = self.language_backbone(z_tokens)
-        return z_text
+        return z_text, eot_pos
 
-    def forward(self, language_input, vision_input): #, joint_input):
-            
-        if self.use_backbone:
-            with torch.no_grad():
-                z_obs = self.preprocess_frames(vision_input)
-                z_text = self.preprocess_text(language_input)
-        else: 
-            z_obs = vision_input.to(self.device) #if torch.is_tensor(vision_input) else vision_input
-            z_text = language_input.to(self.device) #if torch.is_tensor(language_input) else language_input
+    def forward(self, language_input, vision_input, joint_input):
+        
+        # FEATURE EXTRACTION
+        with torch.no_grad():
+            z_obs = self.preprocess_frames(vision_input)
+            z_text, eot_pos = self.preprocess_text(language_input)
         
         B, N, D = z_obs.shape   # B = Batch, N = num of tokens, D = dim of each token
 
+        # END OF TOKEN EMBEDDING
+        eot_embedding = z_text[torch.arange(B), eot_pos]
+
+        # PROJECTION
         z_obs_proj = self.vision_proj(z_obs)
-        z_text_proj = self.language_proj(z_text)
-        #z_joint_proj = self.joint_proj(joint_input)
+        z_text_proj = self.language_proj(eot_embedding).unsqueeze(1)
+        z_joint_proj = self.joint_proj(joint_input).unsqueeze(1)
 
-        action_token_batch = self.action_token.expand(B, -1, -1)
+        # batching the action token
+        action_token = self.action_token.expand(B, -1, -1)
 
-        z_obs_t = z_obs_proj.view(B, self.T, 256, self.embed_dim)
-        #print(f"z_obs_t: {z_obs_t.shape}")
-        actor_actions_list = []
-        for t in range(self.T):
-            kv_t = z_obs_t[:, t, :, :]
-            #q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
-            q_t = torch.cat([z_text_proj, action_token_batch], dim=1)
-            #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
-            #print(f"actor_input: {actor_input_t.shape}")
-            latent_actor_action_t = self.actor(q_t, kv_t)
-            actor_action_t = self.actor_head(latent_actor_action_t[:,-1,:])
-            #print(f"actor_action_t: {actor_action_t.shape}")
-            actor_actions_list.append(actor_action_t)
+        # ATTENTION TEXT*PATCHES
+        attn_logits = torch.bmm(z_obs_proj, z_text_proj.transpose(1, 2)) 
+        attn_weights = torch.softmax(attn_logits, dim=1)
+        z_obs_attention = torch.sum(z_obs_proj * attn_weights, dim=1, keepdim=True) 
 
-        actor_action_seq = torch.stack(actor_actions_list, dim=1)
-        #print(f"actor_action_seq: {actor_action_seq.shape}")
-
+        # ACTOR 
+        actor_context = torch.cat([z_obs_attention, z_text_proj, z_joint_proj], dim=1)
+        latent_actor_action = self.actor(action_token, actor_context)
+        actor_action = self.actor_head(latent_actor_action.squeeze(1))
+       
+        # PREDICTOR
         with torch.no_grad():
-            z_pred, _, _ = self.predictor(z_obs, actor_action_seq)
-            #print(f"z_pred_tokens: {z_pred_tokens.shape}")
-            
+            z_pred, _, _ = self.predictor(z_obs, actor_action.unsqueeze(1))
         z_pred_proj = self.vision_proj(z_pred)
-        z_pred_t = z_pred_proj.view(B, self.T, 256, self.embed_dim)
-        #print(f"z_obs_t: {z_obs_t.shape}")
-        refiner_actions_list = []
-        for t in range(self.T):
-            kv_t = torch.cat([z_obs_t[:, t, :, :], z_pred_t[:,t,:,:]], dim=1)
-            #q_t = torch.cat([z_text_proj, z_joint_proj[:,t:t+1,:], action_token_batch], dim=1)
-            q_t = torch.cat([z_text_proj, action_token_batch], dim=1)
-            #print(f"z_obs_t_mean: {z_obs_t_mean.shape}")
-            #print(f"actor_input: {actor_input_t.shape}")
-            latent_refiner_action_t = self.refiner(q_t, kv_t)
-            refiner_action_t = self.refiner_head(latent_refiner_action_t[:,-1,:])
-            #print(f"actor_action_t: {actor_action_t.shape}")
-            refiner_actions_list.append(refiner_action_t)
+        z_pred_attention = torch.sum(z_pred_proj * attn_weights, dim=1, keepdim=True)
+        
+        # REFINER
+        refiner_context = torch.cat([z_obs_attention, z_pred_attention, z_text_proj, z_joint_proj], dim=1)
+        latent_refiner_action = self.refiner(action_token, refiner_context)
+        refiner_action = self.refiner_head(latent_refiner_action.squeeze(1))
 
-        refiner_action_seq = torch.stack(refiner_actions_list, dim=1)
-
-        return actor_action_seq, refiner_action_seq
+        return actor_action, refiner_action
     
     def print_model_info(self):
         print("MODEL INFO:\n")
-        if self.use_backbone:
-            print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}\n{self.vision_backbone}")
-            print(f"LANGUAGE BACKBONE {self.language_backbone.__class__.__name__}\n{self.language_backbone}")
+        print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}\n{self.vision_backbone}")
+        print(f"LANGUAGE BACKBONE {self.language_backbone.__class__.__name__}\n{self.language_backbone}")
         print(f"LEARNABLE ACTION TOKEN:\n{self.action_token.shape}")
         print(f"PREDICTOR LAYERS:\n{self.predictor.__class__.__name__}\n{self.predictor}")
         print(f"LANGUAGE PROJECTOR LAYERS:\n{self.language_proj}")

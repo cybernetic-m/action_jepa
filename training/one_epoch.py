@@ -116,4 +116,78 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
     
     return metrics
 
+
+def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, device, scaler, validation = False):
+    
+    # Set the model in validation or training mode
+    # Compute the gradient only if we are in training mode, 
+    # in validation mode no gradient computation
+    if validation:
+        predictor.eval()
+        grad_modality = torch.no_grad()
+    else:
+        predictor.train()
+        grad_modality = torch.enable_grad()
+
+    # Loss for this epoch reset to zero
+    epoch_loss = 0 
+    
+    pbar = tqdm(dataloader, desc=f"Validation" if validation else "Training")  
+
+    # Iterating in batches
+    with grad_modality:
+        for batch in pbar:
+            
+            # Taking the data from the batch
+            frames_current = batch['frames_current'].to(device)
+            frames_next = batch['frames_next'].to(device)
+            action = batch['actions'].to(device)
+
+            with torch.no_grad():
+                z_frames_current = vjepa_encoder.preprocess_frames(frames_current)
+                z_obs_current = vjepa_encoder(z_frames_current)
+
+                z_frames_next = vjepa_encoder.preprocess_frames(frames_next)
+                z_obs_next = vjepa_encoder(z_frames_next)
+
+            with autocast(device_type='cuda', enabled=(device == 'cuda')):
+                # Making the predictions
+                z_pred, _, _ = predictor(z_obs_current, action)
+
+                # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
+                loss = loss_fn(z_pred, z_obs_next)
+                        
+            if not validation:
+                
+                optimizer.zero_grad()
+                
+                if scaler is not None:
+                    
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(predictor.parameters(), max_norm=1.0)
+                    scaler.step(optimizer)
+                    scaler.update() 
+
+                else:
+                    
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(predictor.parameters(), max_norm=1.0)
+                    optimizer.step()
+            
+            # Incrementing the loss of the epoch
+            epoch_loss += loss.item()
+            
+            # Updating values in the bar
+            pbar.set_postfix({
+                'loss': f"{loss.item():.4f}",
+            })
+        
+        loss_epoch_avg = epoch_loss / len(dataloader)
+        
+        metrics = {
+            'loss': loss_epoch_avg,
+        }
+    
+    return metrics
             
