@@ -18,7 +18,7 @@ from src.models.ac_predictor import VisionTransformerPredictorAC
 from src.models.utils.modules import build_action_block_causal_attention_mask
 
 class PredictorAC(nn.Module):
-    def __init__(self, model_path, num_frames, grid_h = 16, grid_w = 16, cond_tokens = 2, frozen=True, device="cpu"):
+    def __init__(self, model_path, num_frames, grid_h = 16, grid_w = 16, cond_tokens = 2, frozen=True, finetuned_pred = False, device="cpu"):
         super(PredictorAC, self).__init__()
 
         # Setting the device (ex. cuda or cpu)
@@ -43,19 +43,32 @@ class PredictorAC(nn.Module):
             ).to(device)
             
             checkpoint = torch.load(model_path, map_location=device)
-            state_dict = checkpoint['predictor']
-            
-            # The state_dict keys are saved as "module.predictor_blocks.1.mlp.fc1.weight"
-            # Here we remove module. part if present to have a state dict with keys as "predictor_blocks.1.mlp.fc1.weight"
-            new_state_dict = {}
-            for k, v in state_dict.items():
-                if k.startswith('module.'):
-                    new_key = k[7:]
-                    new_state_dict[new_key] = v
-                else:
-                    new_state_dict[k] = v
 
+            if not finetuned_pred:
+                state_dict = checkpoint['predictor']
+                new_state_dict = {}
+                for k, v in state_dict.items():
+                    if k.startswith('module.'):
+                        new_key = k[7:]
+                        new_state_dict[new_key] = v
+                    else:
+                        new_state_dict[k] = v
+            else:
+                # The state_dict keys are saved as "module.predictor_blocks.1.mlp.fc1.weight"
+                # Here we remove module. part if present to have a state dict with keys as "predictor_blocks.1.mlp.fc1.weight"
+                state_dict = checkpoint['model_state_dict']
+                new_state_dict = {}
+                for k, v in state_dict.items():
+                    # Se la chiave inizia con "predictor.", rimuovilo
+                    if k.startswith('predictor.'):
+                        name = k[10:] # rimuove i primi 10 caratteri "predictor."
+                    else:
+                        name = k
+                    new_state_dict[name] = v
+                    
+            
             self.predictor.load_state_dict(state_dict=new_state_dict)
+            
 
             # Build the attention mask
             mask = build_action_block_causal_attention_mask(

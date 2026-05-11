@@ -3,7 +3,7 @@ def get_loss_weights (epoch, total_epoch):
   
   progress = epoch/total_epoch
 
-  if progress < 0.3:
+  if progress < 0.2:
      lambda_actor, lambda_refiner = 1.0, 0.1
   elif progress < 0.5:
      alpha = (progress - 0.3) / 0.2 # coefficent that goes from 0 to 1 in this interval

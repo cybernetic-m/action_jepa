@@ -16,8 +16,9 @@ class TransformerActionJEPA(nn.Module):
                  language_dim=768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 1024,
+                 embed_dim = 1256,
                  frozen_backbone = True,
+                 finetuned_pred = False,
                  device="cuda"):
         super(TransformerActionJEPA, self).__init__()
 
@@ -30,13 +31,14 @@ class TransformerActionJEPA(nn.Module):
         self.joint_dim = joint_dim
         self.embed_dim = embed_dim
         self.policy = 'transformer'
+        self.finetuned_pred = finetuned_pred
         
     
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
         self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         
-
-        self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, device=device)
+        
+        self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, device=device, finetuned_pred = self.finetuned_pred)
         #self.T = self.num_frames // 2           
         #self.grid_h = 16     
         #self.grid_w = 16

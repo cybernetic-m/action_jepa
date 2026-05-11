@@ -24,9 +24,12 @@ class PolicyDataset(Dataset):
             
         self.window_indices = []
 
+        self.demos = []
 
         for data_idx, path in enumerate(self.file_paths):
             data = torch.load(path, map_location='cpu', weights_only=False)
+
+            self.demos.append(data)
             
             steps = data['frames'].shape[0] 
             
@@ -40,9 +43,10 @@ class PolicyDataset(Dataset):
     
     def __getitem__(self, index):
         data_idx, start_idx = self.window_indices[index] 
-        demo_path = self.file_paths[data_idx]
+        demo = self.demos[data_idx]
+        #demo_path = self.file_paths[data_idx]
 
-        demo = torch.load(demo_path, map_location='cpu', weights_only=False)
+        #demo = torch.load(demo_path, map_location='cpu', weights_only=False)
 
         frames = demo['frames']
         vision_input = frames[start_idx:start_idx+2]
