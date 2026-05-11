@@ -16,7 +16,7 @@ class TransformerActionJEPA(nn.Module):
                  language_dim=768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 1256,
+                 embed_dim = 1512,
                  frozen_backbone = True,
                  finetuned_pred = False,
                  device="cuda"):
