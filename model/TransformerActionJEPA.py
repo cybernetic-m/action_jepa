@@ -33,22 +33,11 @@ class TransformerActionJEPA(nn.Module):
         self.policy = 'transformer'
         self.finetuned_pred = finetuned_pred
         
-    
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
         self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         
-        
         self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, device=device, finetuned_pred = self.finetuned_pred)
-        #self.T = self.num_frames // 2           
-        #self.grid_h = 16     
-        #self.grid_w = 16
-        #self.cond_tokens = 2 
-        #mask = build_action_block_causal_attention_mask(
-        #    self.T, self.grid_h, self.grid_w, add_tokens=self.cond_tokens
-        #)
-        #self.predictor.predictor.attn_mask = mask.to(device)
-        #self.predictor.predictor.is_frame_causal = True
-
+  
         self.joint_proj = nn.Linear(joint_dim, embed_dim)
         self.language_proj = nn.Linear(language_dim, embed_dim)
         self.vision_proj = nn.Linear(vision_dim, embed_dim)
@@ -78,6 +67,8 @@ class TransformerActionJEPA(nn.Module):
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
         self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
 
+        self.apply(self._init_weights)
+
     def preprocess_frames(self, vision_input):
         z_frames = self.vision_backbone.preprocess_frames(vision_input)
         z_obs = self.vision_backbone(z_frames)
@@ -88,6 +79,28 @@ class TransformerActionJEPA(nn.Module):
         eot_pos = z_tokens['input_ids'].argmax(dim=-1)
         z_text = self.language_backbone(z_tokens)
         return z_text, eot_pos
+    
+    def _init_weights(self, layer):
+
+        # Initialize the MLP head weights through HE initialization, while for the projectors we use a normal distribution, all the biases to zero
+        # the trunc normal is used also for linear layers inside the transformers actor and refiner
+        if isinstance(layer, nn.Linear):
+            if any(name in str(layer) for name in ['actor_head', 'refiner_head']):
+                nn.init.kaiming_normal_(layer.weight, mode='fan_out', nonlinearity='relu')
+            else:
+                nn.init.trunc_normal_(layer.weight, std=0.02)
+            
+            if layer.bias is not None:
+                nn.init.constant_(layer.bias, 0)
+
+        # LayerNorm layers weights will have bias 0 and weights 1
+        elif isinstance(layer, nn.LayerNorm):
+            nn.init.constant_(layer.bias, 0)
+            nn.init.constant_(layer.weight, 1.0)
+        
+        # For the action token we have normally distributed weights with std 0.02
+        elif isinstance(layer, nn.Parameter):
+            nn.init.normal_(layer, std=0.02)
 
     def forward(self, language_input, vision_input, joint_input):
         

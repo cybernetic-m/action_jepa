@@ -208,7 +208,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
      env.close()
      del env
 
-def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision_backbone = None, language_backbone = None, chunk_size = 30):
+def preprocess_data(data_dir, output_dir, vision_backbone, language_backbone):
    
   # Create the output directory if it does not exist where to save the .pt file
   # The data_dir is a path of the type ../resampled_data/libero_goal/1 where we extract "libero_goal" as dataset_name and '1' as task_id
@@ -236,7 +236,6 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
         "task_id": task_id,
         "task_name": info.get(task_id, "unknown_task"),
         "text_instruction": text_instruction,
-        "num_frames": num_frames
     }
 
   # Saving the correspondance map in json file
@@ -280,24 +279,24 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
     frames_repeated = frames_repeated[1:-1] # eliminate first and last frame (1,2,2,3,3,4)
 
     # Copying for num_frames the first frame (needed for inference)
-    frames_firstRepeated = np.repeat(frames_repeated[0:1], num_frames, axis = 0)
-    frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
+    #frames_firstRepeated = np.repeat(frames_repeated[0:1], num_frames, axis = 0)
+    #frames_padded = np.concatenate([frames_firstRepeated, frames_repeated], axis = 0)
 
     # Save the actions that are 7D values of the type (Dx, Dy, Dz, Drx, Dry, Drz, Dgripper)
     # where D means delta values of translations (first three), axis angle orientation (second three)
     # while Dgripper is [-1, 0, 1] discrete values means [open, nochange, close] the gripper
     # We need to put zero actions for the num_frames repeated first frame!
-    action_padding = np.zeros((num_frames // 2, action_dim))
-    actions_padded = np.concatenate([action_padding, actions], axis=0)
+    #action_padding = np.zeros((num_frames // 2, action_dim))
+    #actions_padded = np.concatenate([action_padding, actions], axis=0)
 
     # We do the same padding for joints
-    joint_padding = np.repeat(joint_states[0:1], num_frames // 2, axis = 0)
-    joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
+    #joint_padding = np.repeat(joint_states[0:1], num_frames // 2, axis = 0)
+    #joints_states_padded = np.concatenate([joint_padding, joint_states], axis=0)
 
     # We return a dictionary with raw data or processed data with feature extraction depending on the modality chosen
     with torch.no_grad():
       # VJEPA takes the frames (Ex. 90), compute the tubelets T = 90/2 = 45 and for each pair of frames return 256 tokens (i.e. 45x256 = 11520 tokens)
-      z_frames = vision_backbone.preprocess_frames(frames_padded)
+      z_frames = vision_backbone.preprocess_frames(frames_repeated)
       z_obs = vision_backbone(z_frames).cpu()
       
       # To avoid saturating the VRAM, we preprocess frames in chunks of 30 frames with the V-JEPA encoder
@@ -318,9 +317,11 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
     steps = z_obs.shape[1] // 256  
 
     # Tronchiamo azioni e giunti per farli combaciare al 100%
-    if actions_padded.shape[0] > steps:
-        actions_padded = actions_padded[:steps]
-        joints_states_padded = joints_states_padded[:steps]
+    
+    if actions.shape[0] > steps:
+        actions = actions[:steps]
+        joints_states = joints_states[:steps]
+    
     
     #print(f"frames: {frames.shape}")
     #print(f"frames repeated: {frames_repeated.shape}")
@@ -331,8 +332,8 @@ def preprocess_data(data_dir, output_dir, num_frames = 4, action_dim = 7, vision
       
     data = {"z_obs": z_obs.half(), # saving in float16 to save space
             "z_text": z_text.half(), # saving in float16 to save space
-            "joint_states": torch.from_numpy(joints_states_padded).float(),
-            "actions": torch.from_numpy(actions_padded).float(),
+            "joint_states": torch.from_numpy(joint_states).float(),
+            "actions": torch.from_numpy(actions).float(),
             }
   
     # saving something like task_0_demo_1.pt, you can see from task_map.json file that '0' is 'KITCHEN_SCENE....'ù

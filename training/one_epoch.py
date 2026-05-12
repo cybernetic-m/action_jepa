@@ -69,6 +69,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     scaler.scale(loss).backward()
                     
                     scaler.unscale_(optimizer)
+
                     if model.policy == 'transformer':
                         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
         
@@ -94,7 +95,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             pbar.set_postfix({
                 'loss': f"{loss.item():.4f}",
                 'actor loss': f"{loss_actor.item():.4f}",
-                'refiner loss': f"{loss_refiner.item():.4f}"
+                'refiner loss': f"{loss_refiner.item():.4f}",
             })
         
         loss_epoch_avg = epoch_loss / len(dataloader)

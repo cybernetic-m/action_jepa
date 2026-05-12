@@ -42,17 +42,13 @@ if __name__ == "__main__":
 
     NUM_FRAMES = config['num_frames']
     DATASET_TYPE = config['dataset_type_preprocessing']
-    CHUNK_SIZE = config['chunk_size']
+    #CHUNK_SIZE = config['chunk_size']
 
-    if DATASET_TYPE == "all":
-        selected_tasks = ["libero_spatial", "libero_goal", "libero_object", "libero_10", "libero_90"]
-    else:
-        selected_tasks = [DATASET_TYPE]
-
+    
     # PART OF EXTRACT FEATURES FOR DATA
     
     # A list of the type: ['../resampled_data/libero_goal/2', '../resampled_data/libero_goal/3', '../resampled_data/libero_goal/9' ...]
-    data_paths = sorted([f"{d}" for task in selected_tasks for d in glob.glob(os.path.join(resample_data_dir, task, "*")) if os.path.isdir(d)])
+    data_paths = sorted([f"{d}" for task in DATASET_TYPE for d in glob.glob(os.path.join(resample_data_dir, task, "*")) if os.path.isdir(d)])
     
     checkpoints_path = "../checkpoints"
     # Path for all the models
@@ -70,9 +66,6 @@ if __name__ == "__main__":
                                 output_dir=processed_data_dir, 
                                 vision_backbone = vision_backbone,
                                 language_backbone = language_backbone,
-                                num_frames = NUM_FRAMES,
-                                action_dim = 7,
-                                chunk_size = CHUNK_SIZE
                                 )
 
 
