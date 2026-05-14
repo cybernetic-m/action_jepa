@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     # Set the devide mode on GPU (if available CUDA for Nvidia and  MPS for Apple Silicon) or CPU
     if torch.cuda.is_available():
-        device = "cuda"
+        device = "cuda:1"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
