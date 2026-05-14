@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     # Set the devide mode on GPU (if available CUDA for Nvidia and  MPS for Apple Silicon) or CPU
     if torch.cuda.is_available():
-        device = "cuda:1"
+        device = "cuda"
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -100,9 +100,6 @@ if __name__ == '__main__':
 
     model.print_model_info()
 
-    with open('config_policy.json', 'r') as f:
-        config = json.load(f)
-
     # Name of the directory for the results
     results_dir_path = "./results/policy"
     os.makedirs(results_dir_path, exist_ok=True)
@@ -137,6 +134,7 @@ if __name__ == '__main__':
         persistent_workers=True
     )
 
+    '''
     training_dir_path = train_policy(
         model=model,
         train_loader=train_loader,
@@ -149,5 +147,14 @@ if __name__ == '__main__':
         scaler=scaler,
         results_dir_path=results_dir_path,
     )
+    '''
+
+    print("\n" + "!"*40)
+    print(f"TEST GPU: Modello caricato su {device}")
+    print("Controlla ora 'nvidia-smi' in un altro terminale.")
+    print("Premi INVIO per chiudere il test e liberare la memoria.")
+    print("!"*40)
+    
+    input() # Blocca lo script qui
 
 
