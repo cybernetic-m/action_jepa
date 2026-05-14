@@ -67,7 +67,7 @@ class TransformerActionJEPA(nn.Module):
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
         self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
 
-        self.apply(self._init_weights)
+        #self.apply(self._init_weights)
 
     def preprocess_frames(self, vision_input):
         z_frames = self.vision_backbone.preprocess_frames(vision_input)
@@ -76,7 +76,7 @@ class TransformerActionJEPA(nn.Module):
     
     def preprocess_text(self, language_input):
         z_tokens = self.language_backbone.tokenization(language_input)
-        eot_pos = z_tokens['input_ids'].argmax(dim=-1)
+        eot_pos = (z_tokens['input_ids'] == self.language_backbone.tokenizer.eos_token_id).int().argmax(dim=-1)
         z_text = self.language_backbone(z_tokens)
         return z_text, eot_pos
     
@@ -105,6 +105,7 @@ class TransformerActionJEPA(nn.Module):
     def forward(self, language_input, vision_input, joint_input):
         
         # FEATURE EXTRACTION
+        
         with torch.no_grad():
             z_obs = self.preprocess_frames(vision_input)
             z_text, eot_pos = self.preprocess_text(language_input)

@@ -24,6 +24,7 @@ from modules.CLIPEncoder import CLIPEncoder
 from modules.VJEPAEncoder import VJEPAEncoder
 import glob
 
+
 if __name__ == "__main__":
         
     if torch.cuda.is_available():
@@ -37,7 +38,7 @@ if __name__ == "__main__":
     processed_data_dir ='../processed_data'
     resample_data_dir = '../resampled_data'
     
-    with open('../config.json', 'r') as f:
+    with open('../config_policy.json', 'r') as f:
         config = json.load(f)
 
     NUM_FRAMES = config['num_frames']

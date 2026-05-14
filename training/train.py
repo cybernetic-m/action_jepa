@@ -17,7 +17,7 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     os.makedirs(training_dir_path, exist_ok = True)
 
     # Initializing loss value (the best_vloss is very high at start to save surely the first model epoch)
-    best_vloss = 100000000 
+    best_mae_xyz = 100000000 
     best_epoch = 1
 
     config_dict = {
@@ -104,10 +104,10 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
         
         print("-" * 80) 
 
-        current_vloss = val_metrics['loss']
+        current_mae_xyz = val_metrics['mae_xyz']
 
-        if current_vloss < best_vloss:
-            best_vloss = current_vloss
+        if current_mae_xyz < best_mae_xyz:
+            best_mae_xyz = current_mae_xyz
             best_epoch = epoch+1
             model_save_path = os.path.join(training_dir_path, f"best_model.pth")
             checkpoint = {
@@ -115,10 +115,19 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
+                'action_stats': { 
+                        'min': train_loader.dataset.actions_min.cpu().numpy(),
+                        'max': train_loader.dataset.actions_max.cpu().numpy()
+                    },
                 'config': config
             }
             torch.save(checkpoint, model_save_path)
-            print(f"Best model! Saving in: {model_save_path}")
+            print(f"🔥 BEST MODEL SAVED! XYZ Err: {current_mae_xyz:.4f} (Epoch {best_epoch})")
+        
+        if (epoch + 1) % 10 == 0:
+            last_model_path = os.path.join(training_dir_path, f"last_checkpoint_model.pth")
+            torch.save(model.state_dict(), last_model_path)
+            print(f"LAST CHECKPOINT MODEL SAVED! (Epoch {epoch+1})")
 
         df_train = pd.DataFrame(train_history).add_suffix('_train')
         df_val = pd.DataFrame(val_history).add_suffix('_val')

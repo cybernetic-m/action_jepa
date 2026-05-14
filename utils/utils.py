@@ -320,7 +320,7 @@ def preprocess_data(data_dir, output_dir, vision_backbone, language_backbone):
     
     if actions.shape[0] > steps:
         actions = actions[:steps]
-        joints_states = joints_states[:steps]
+        joint_states = joint_states[:steps]
     
     
     #print(f"frames: {frames.shape}")
