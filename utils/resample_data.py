@@ -28,19 +28,13 @@ if __name__ == "__main__":
     datasets_dir = "../LIBERO/libero/datasets"
     resample_data_dir = '../resampled_data'
     
-    with open('../config.json', 'r') as f:
+    with open('../config_policy.json', 'r') as f:
         config = json.load(f)
 
-    DATASET_TYPE = config['dataset_type_preprocessing']
-
-    if DATASET_TYPE == "all":
-        selected_tasks = ["libero_spatial", "libero_goal", "libero_object", "libero_10", "libero_90"] 
-    else:
-        selected_tasks = [DATASET_TYPE]
+    DATASETS = config['datasets_resampling']
 
     # PART OF RESAMPLING DATA 
-
-    for dataset_name in selected_tasks:
+    for dataset_name in DATASETS:
         
         files = sorted(glob.glob(os.path.join(f"{datasets_dir}/{dataset_name}", "*.hdf5")))
         benchmark_dict = benchmark.get_benchmark_dict() 
