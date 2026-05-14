@@ -134,7 +134,6 @@ if __name__ == '__main__':
         persistent_workers=True
     )
 
-    '''
     training_dir_path = train_policy(
         model=model,
         train_loader=train_loader,
@@ -147,14 +146,6 @@ if __name__ == '__main__':
         scaler=scaler,
         results_dir_path=results_dir_path,
     )
-    '''
 
-    print("\n" + "!"*40)
-    print(f"TEST GPU: Modello caricato su {device}")
-    print("Controlla ora 'nvidia-smi' in un altro terminale.")
-    print("Premi INVIO per chiudere il test e liberare la memoria.")
-    print("!"*40)
-    
-    input() # Blocca lo script qui
 
 
