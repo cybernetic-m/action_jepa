@@ -63,7 +63,7 @@ class PolicyDataset(Dataset):
         
         actions = demo['actions'].float()
         action_output = actions[start_idx]
-        action_output = 2 * (action_output - self.actions_min) / (self.actions_max - self.actions_min + 1e-8) - 1   # Normalizing action
+        #action_output = 2 * (action_output - self.actions_min) / (self.actions_max - self.actions_min + 1e-8) - 1   # Normalizing action
         
         joint_states = demo['joint_states'].float()
         joint_input = joint_states[start_idx]
