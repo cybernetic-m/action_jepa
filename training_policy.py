@@ -133,7 +133,7 @@ if __name__ == '__main__':
         prefetch_factor=PREFETCH_FACTOR,
         persistent_workers=True
     )
-    '''
+    
     training_dir_path = train_policy(
         model=model,
         train_loader=train_loader,
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         scaler=scaler,
         results_dir_path=results_dir_path,
     )
-    '''
+
 
 
 
