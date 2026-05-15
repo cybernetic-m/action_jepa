@@ -143,3 +143,36 @@ class TransformerActionJEPA(nn.Module):
         refiner_action = self.refiner_head(latent_refiner_action.squeeze(1)) # (B, action_dim)
 
         return actor_action, refiner_action
+    
+    def print_model_info(self):
+        print("="*60)
+        print("                  MODEL ARCHITECTURE INFO                  ")
+        print("="*60 + "\n")
+        
+        print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}")
+        print(f"LANGUAGE BACKBONE: {self.language_backbone.__class__.__name__}\n")
+        
+        print(f"ACTION TOKEN SHAPE: {self.action_token.shape}\n")
+        
+        print(f"LATENT PREDICTOR: {self.predictor.__class__.__name__}\n")
+        
+        print("-" * 50)
+        print("MULTIMODAL PROJECTORS (MLP)")
+        print("-" * 50)
+        print(f"VISION PROJECTOR:\n{self.vision_proj}")
+        print(f"LANGUAGE PROJECTOR:\n{self.language_proj}")
+        print(f"JOINT PROJECTOR:\n{self.joint_proj}")
+        print(f"ACTION PROJECTOR:\n{self.action_proj}\n")
+        
+        print("-" * 50)
+        print("TRANSFORMER DECODERS")
+        print("-" * 50)
+        print(f"ACTOR DECODER:\n{self.actor}")
+        print(f"REFINER DECODER:\n{self.refiner}\n")
+        
+        print("-" * 50)
+        print("OUTPUT HEADS (MLP)")
+        print("-" * 50)
+        print(f"ACTOR HEAD:\n{self.actor_head}")
+        print(f"REFINER HEAD:\n{self.refiner_head}")
+        print("="*60 + "\n")
