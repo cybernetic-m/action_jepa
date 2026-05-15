@@ -37,7 +37,7 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     # While in the cosine decay starting from 1e-4 it decrase for T_max epochs until reaching eta_min
     # The SequentialLR after milestones epochs change the scheduler between the two schedulers
     
-    warmup_epochs = 10
+    warmup_epochs = 0
     warmup_scheduler = opti.LinearLR(
         optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs
     )
