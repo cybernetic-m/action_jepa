@@ -3,7 +3,7 @@ import random
 import json
 from Dataset.PolicyDataset import PolicyDataset
 from model.MLPActionJEPA import MLPActionJEPA
-from model.TransformerActionJEPA2 import TransformerActionJEPA
+from model.TransformerActionJEPA3 import TransformerActionJEPA
 from training.train import train_policy
 import torch
 import torch.nn as nn
