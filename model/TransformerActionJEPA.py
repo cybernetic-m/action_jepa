@@ -51,7 +51,7 @@ class TransformerActionJEPA(nn.Module):
                 dim_feedforward=4096, 
                 dropout=0.1, 
                 batch_first = True),
-            num_layers = 12
+            num_layers = 10
                 )
         
         self.refiner = nn.TransformerDecoder(
@@ -61,7 +61,7 @@ class TransformerActionJEPA(nn.Module):
                 dim_feedforward=4096, 
                 dropout=0.1, 
                 batch_first = True),
-            num_layers = 12
+            num_layers = 10
                 )
 
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
