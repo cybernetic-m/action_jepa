@@ -47,21 +47,21 @@ class TransformerActionJEPA(nn.Module):
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
-                dim_feedforward=2048, 
-                dropout=0.2, 
+                nhead=16, 
+                dim_feedforward=4096, 
+                dropout=0.1, 
                 batch_first = True),
-            num_layers = 5
+            num_layers = 12
                 )
         
         self.refiner = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
-                dim_feedforward=2048, 
-                dropout=0.2, 
+                nhead=16, 
+                dim_feedforward=4096, 
+                dropout=0.1, 
                 batch_first = True),
-            num_layers = 5
+            num_layers = 12
                 )
 
         self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
