@@ -27,7 +27,7 @@ class PolicyDataset(Dataset):
         self.all_actions = []
         self.window_indices = []
 
-        for data_idx, path in enumerate(tqdm(self.file_paths, desc="Processing dataset files")):
+        for data_idx, path in enumerate(tqdm(self.file_paths, desc="Loading Dataset")):
             data = torch.load(path, map_location='cpu', mmap=True, weights_only=False)
 
             #self.all_actions.append(data['actions'].float())
