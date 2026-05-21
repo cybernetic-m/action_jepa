@@ -64,9 +64,11 @@ if __name__ == '__main__':
     print(f"Mixed Precision: {MIXED_PRECISION}")
     print("="*40)
 
+    print("Loading Dataset...")
     dataset = PolicyDataset(datasets=DATASETS,
                         task_ids = TASK_IDS,
                         )
+    print("Finish Loading Dataset...")
 
     train_percentage = 0.7
     val_percentage = 0.2
