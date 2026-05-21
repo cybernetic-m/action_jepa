@@ -100,7 +100,7 @@ if __name__ == '__main__':
             vjepa_encoder_path=vjepa_path,
             vjepa_predictor_path=predictor_path,
             clip_model_path=clip_path,
-            finetuned_pred=FINETUNED_PRED
+            finetuned_pred=FINETUNED_PRED,
             device=device,
         ).to(device)
 
