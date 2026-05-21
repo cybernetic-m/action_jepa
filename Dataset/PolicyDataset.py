@@ -6,13 +6,14 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 class PolicyDataset(Dataset):
-    def __init__(self, datasets, task_ids):
+    def __init__(self, datasets, task_ids, full_load_ram = False):
 
         super(PolicyDataset, self).__init__()
 
         self.file_paths = []   # a list of all the file paths (Ex. ./resampled_data/libero_10/task_0_demo_0.pt)
         self.datasets = datasets
         self.task_ids = task_ids
+        self.full_load_ram = full_load_ram
         
         for dataset in self.datasets:
             for task_id in self.task_ids:
@@ -26,9 +27,15 @@ class PolicyDataset(Dataset):
         self.file_paths.sort()
         self.all_actions = []
         self.window_indices = []
+        
+        if self.full_load_ram:
+            self.loaded_demos = []
 
         for data_idx, path in enumerate(tqdm(self.file_paths, desc="Loading Dataset")):
-            data = torch.load(path, map_location='cpu', mmap=True, weights_only=False)
+            data = torch.load(path, map_location='cpu', weights_only=False)
+
+            if self.full_load_ram:
+                self.loaded_demos.append(data)
 
             #self.all_actions.append(data['actions'].float())
 
@@ -52,10 +59,13 @@ class PolicyDataset(Dataset):
     
     def __getitem__(self, index):
 
-        data_idx, start_idx = self.window_indices[index] 
-        demo_path = self.file_paths[data_idx]
+        data_idx, start_idx = self.window_indices[index]
 
-        demo = torch.load(demo_path, map_location='cpu', weights_only=False)
+        if self.full_load_ram:
+            demo = self.loaded_demos[data_idx]
+        else:
+            demo_path = self.file_paths[data_idx]
+            demo = torch.load(demo_path, map_location='cpu', weights_only=False)
         
         frames = demo['frames']
         vision_input = frames[start_idx:start_idx+2]
