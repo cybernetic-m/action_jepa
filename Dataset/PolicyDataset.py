@@ -3,6 +3,7 @@ import glob
 import os
 import numpy as np
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 class PolicyDataset(Dataset):
     def __init__(self, datasets, task_ids):
@@ -27,7 +28,7 @@ class PolicyDataset(Dataset):
         self.window_indices = []
 
         for data_idx, path in enumerate(self.file_paths):
-            data = torch.load(path, map_location='cpu', weights_only=False)
+            data = torch.load(path, map_location='cpu', mmap=True, weights_only=False)
 
             self.all_actions.append(data['actions'].float())
 
