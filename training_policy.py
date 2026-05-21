@@ -42,6 +42,7 @@ if __name__ == '__main__':
     # Hyperparameters definition
     NUM_EPOCHS = config['num_epochs']
     BATCH_SIZE = config['batch_size']
+    FINETUNED_PRED = config['finetuned_pred']
     LEARNING_RATE = config['learning_rate']
     DATASETS = config['datasets']   # it can be  a list of "libero_10", "libero_90", "libero_spatial", "libero_object", "libero_goal"...
     TASK_IDS = config['task_ids'] # it can be a list of task_ids (from 0 to 9) depending on how much tasks of the datasets you want to train your model
@@ -57,6 +58,7 @@ if __name__ == '__main__':
     print(f"LR: {LEARNING_RATE} ")
     print(f"Dataset: {DATASETS}")
     print(f"Tasks: {TASK_IDS}")
+    print(f"Fine Tuned predictor: {FINETUNED_PRED}")
     print(f"Max Length: {MAX_LENGTH}")
     print(f"Policy type: {POLICY}")
     print(f"Mixed Precision: {MIXED_PRECISION}")
@@ -80,21 +82,25 @@ if __name__ == '__main__':
     checkpoints_path = "./checkpoints"
     # Path for all the models
     vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
-    vjepa_pred_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
+    if FINETUNED_PRED:
+        predictor_path = 'results/predictor/2026_05_15__14_49/best_model.pth'
+    else:
+        predictor_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
     clip_path = os.path.join(checkpoints_path,"openai/clip-vit-large-patch14")
 
     if POLICY == "mlp":
         model = MLPActionJEPA(
             vjepa_encoder_path=vjepa_path,
-            vjepa_predictor_path=vjepa_pred_path,
+            vjepa_predictor_path=predictor_path,
             clip_model_path=clip_path,
             device=device
         ).to(device)
     else:
         model = TransformerActionJEPA(
             vjepa_encoder_path=vjepa_path,
-            vjepa_predictor_path=vjepa_pred_path,
+            vjepa_predictor_path=predictor_path,
             clip_model_path=clip_path,
+            finetuned_pred=FINETUNED_PRED
             device=device,
         ).to(device)
 
