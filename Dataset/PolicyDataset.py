@@ -27,23 +27,23 @@ class PolicyDataset(Dataset):
         self.all_actions = []
         self.window_indices = []
 
-        for data_idx, path in enumerate(self.file_paths):
+        for data_idx, path in enumerate(tqdm(self.file_paths, desc="Processing dataset files")):
             data = torch.load(path, map_location='cpu', mmap=True, weights_only=False)
 
-            self.all_actions.append(data['actions'].float())
+            #self.all_actions.append(data['actions'].float())
 
             steps = data['frames'].shape[0] 
             
             for start_idx in range(0, steps-1):
                 self.window_indices.append((data_idx,start_idx))
 
-        tensor_actions = torch.cat(self.all_actions, dim=0)
-        self.actions_min = tensor_actions.min(dim=0)[0]
-        self.actions_max = tensor_actions.max(dim=0)[0]
+        #tensor_actions = torch.cat(self.all_actions, dim=0)
+        #self.actions_min = tensor_actions.min(dim=0)[0]
+        #self.actions_max = tensor_actions.max(dim=0)[0]
 
-        stats = {'min': self.actions_min.numpy(), 'max': self.actions_max.numpy()}
-        np.save(f'{datasets}_action_stats.npy', stats)
-        print(f"Stats saved in './Dataset' as {datasets}_action_stats.npy! Min: {self.actions_min}, Max: {self.actions_max}")
+        #stats = {'min': self.actions_min.numpy(), 'max': self.actions_max.numpy()}
+        #np.save(f'{datasets}_action_stats.npy', stats)
+        #print(f"Stats saved in './Dataset' as {datasets}_action_stats.npy! Min: {self.actions_min}, Max: {self.actions_max}")
         self.window_indices.sort()
             
 
