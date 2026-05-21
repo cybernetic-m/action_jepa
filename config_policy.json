@@ -11,6 +11,6 @@
     "finetuned_pred": false,
     "policy": "transformer",
     "mixed_precision": true,
-    "num_workers": 8,
-    "prefetch_factor": 2
+    "num_workers": 16,
+    "prefetch_factor": 6
 }
