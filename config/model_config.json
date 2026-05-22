@@ -1,4 +1,5 @@
 {
+    "policy": "transformer",
     "num_frames": 2,
     "max_length": 77,
     "vision_dim": 1408,
