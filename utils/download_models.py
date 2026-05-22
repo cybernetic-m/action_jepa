@@ -15,7 +15,7 @@ def hf_download_models(hf_model_list):
 # Returns:
 #   target_dir: The local directory where the downloaded models are saved, in this case "checkpoints"
 
-    target_dir = "checkpoints" # the directory where the downloaded models will be saved 
+    target_dir = "../checkpoints" # the directory where the downloaded models will be saved 
 
     # Create the target directory if it does not exist, otherwise print that the directory already exists
     os.makedirs(target_dir, exist_ok=True)
