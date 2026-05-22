@@ -28,7 +28,7 @@ if __name__ == "__main__":
     datasets_dir = "../LIBERO/libero/datasets"
     resample_data_dir = '../resampled_data'
     
-    with open('../config_policy.json', 'r') as f:
+    with open('../config/config_training_policy.json', 'r') as f:
         config = json.load(f)
 
     DATASETS = config['datasets_resampling']
