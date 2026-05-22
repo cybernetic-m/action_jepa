@@ -16,7 +16,7 @@ class TransformerActionJEPA(nn.Module):
                  language_dim = 768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 2048,
+                 embed_dim = 1536,
                  transformer_layers = 6,
                  transformer_heads = 8,
                  transformer_ff_dim = 2048,
