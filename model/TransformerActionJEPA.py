@@ -13,10 +13,16 @@ class TransformerActionJEPA(nn.Module):
                  clip_model_path,
                  num_frames=2,
                  vision_dim = 1408,
-                 language_dim=768,
+                 language_dim = 768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 1024,
+                 embed_dim = 2048,
+                 transformer_layers = 6,
+                 transformer_heads = 8,
+                 transformer_ff_dim = 2048,
+                 transformer_dropout = 0.1,
+                 mlp_hidden_dims = [512, 256, 128],
+                 mlp_dropout = 0.1,
                  frozen_backbone = True,
                  finetuned_pred = False,
                  device="cuda"):
@@ -32,7 +38,14 @@ class TransformerActionJEPA(nn.Module):
         self.embed_dim = embed_dim
         self.policy = 'transformer'
         self.finetuned_pred = finetuned_pred
-        
+        self.transformer_layers = transformer_layers
+        self.transformer_heads = transformer_heads
+        self.transformer_ff_dim = transformer_ff_dim
+        self.transformer_dropout = transformer_dropout
+        self.mlp_hidden_dims = mlp_hidden_dims
+        self.mlp_dropout = mlp_dropout
+
+    
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
         self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         
@@ -47,25 +60,25 @@ class TransformerActionJEPA(nn.Module):
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=16, 
-                dim_feedforward=4096, 
-                dropout=0.1, 
+                nhead=self.transformer_heads, 
+                dim_feedforward=self.transformer_ff_dim, 
+                dropout=self.transformer_dropout, 
                 batch_first = True),
-            num_layers = 10
+            num_layers = self.transformer_layers
                 )
         
         self.refiner = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=16, 
-                dim_feedforward=4096, 
-                dropout=0.1, 
+                nhead=self.transformer_heads, 
+                dim_feedforward=self.transformer_ff_dim, 
+                dropout=self.transformer_dropout, 
                 batch_first = True),
-            num_layers = 10
+            num_layers = self.transformer_layers
                 )
 
-        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
-        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
+        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=self.mlp_hidden_dims, output_dim=action_dim, dropout=self.mlp_dropout)
+        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=self.mlp_hidden_dims, output_dim=action_dim, dropout=self.mlp_dropout)
 
         #self.apply(self._init_weights)
 

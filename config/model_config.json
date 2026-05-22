@@ -1,0 +1,17 @@
+{
+    "num_frames": 2,
+    "max_length": 77,
+    "vision_dim": 1408,
+    "language_dim": 768,
+    "action_dim": 7,
+    "joint_dim": 7,
+    "embed_dim": 1536,
+    "frozen_backbone": true,
+    "finetuned_pred": false,
+    "transformer_layers": 6,
+    "transformer_heads": 8,
+    "transformer_ff_dim": 2048,
+    "transformer_dropout": 0.2,
+    "mlp_hidden_dims": [512, 256, 128],
+    "mlp_dropout": 0.1
+}

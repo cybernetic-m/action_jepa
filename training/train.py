@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import pandas as pd
 
-def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, config, results_dir_path, scaler):
+def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs, device, training_config, model_config, results_dir_path, scaler):
     
     print(f"Scaler status -> {'ACTIVE (Mixed Precision)' if scaler is not None else 'INACTIVE (FP32)'}")
 
@@ -21,10 +21,11 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     best_epoch = 1
 
     config_dict = {
-        'hyperparameters': config,
+        'training': training_config,
+        'model': model_config
     }
 
-    json_save_path = os.path.join(training_dir_path, "experiment_config.json")
+    json_save_path = os.path.join(training_dir_path, "config.json")
     with open(json_save_path, "w") as f:
         json.dump(config_dict, f, indent=4)
 
@@ -37,16 +38,10 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     # While in the cosine decay starting from 1e-4 it decrase for T_max epochs until reaching eta_min
     # The SequentialLR after milestones epochs change the scheduler between the two schedulers
     
-    warmup_epochs = 0
-    warmup_scheduler = opti.LinearLR(
-        optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs
+    scheduler = opti.CosineAnnealingLR(
+        optimizer, T_max=num_epochs, eta_min=1e-5
     )
-    decay_scheduler = opti.CosineAnnealingLR(
-        optimizer, T_max=(num_epochs - warmup_epochs), eta_min=1e-6
-    )
-    scheduler = opti.SequentialLR(
-        optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_epochs]
-    )
+
     current_lr = optimizer.param_groups[0]['lr']
     
     for epoch in range(num_epochs):
@@ -119,14 +114,22 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
                  #       'min': train_loader.dataset.actions_min.cpu().numpy(),
                   #      'max': train_loader.dataset.actions_max.cpu().numpy()
                    # },
-                'config': config
+                'training_config': training_config,
+                'model_config': model_config
             }
             torch.save(checkpoint, model_save_path)
             print(f"🔥 BEST MODEL SAVED! XYZ Err: {current_mae_xyz:.4f} (Epoch {best_epoch})")
         
         if (epoch + 1) % 10 == 0:
             last_model_path = os.path.join(training_dir_path, f"last_checkpoint_model.pth")
-            torch.save(model.state_dict(), last_model_path)
+            checkpoint = {
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'training_config': training_config,
+                'model_config': model_config
+            }
+            torch.save(checkpoint, last_model_path)
             print(f"LAST CHECKPOINT MODEL SAVED! (Epoch {epoch+1})")
 
         df_train = pd.DataFrame(train_history).add_suffix('_train')
@@ -159,7 +162,7 @@ def train_predictor(predictor, vjepa_encoder, train_loader, val_loader, loss_fn,
         'hyperparameters': config,
     }
 
-    json_save_path = os.path.join(training_dir_path, "experiment_config.json")
+    json_save_path = os.path.join(training_dir_path, "config.json")
     with open(json_save_path, "w") as f:
         json.dump(config_dict, f, indent=4)
 

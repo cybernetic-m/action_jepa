@@ -35,22 +35,36 @@ if __name__ == '__main__':
         device = "cpu"
 
 
-    # Loading the config.json file
-    with open('config_policy.json', 'r') as f:
-        config = json.load(f)
+    # Loading the config.json files
+    with open('./config/config_training_policy.json', 'r') as f:
+        training_config = json.load(f)
 
-    # Hyperparameters definition
-    NUM_EPOCHS = config['num_epochs']
-    BATCH_SIZE = config['batch_size']
-    FINETUNED_PRED = config['finetuned_pred']
-    LEARNING_RATE = config['learning_rate']
-    DATASETS = config['datasets']   # it can be  a list of "libero_10", "libero_90", "libero_spatial", "libero_object", "libero_goal"...
-    TASK_IDS = config['task_ids'] # it can be a list of task_ids (from 0 to 9) depending on how much tasks of the datasets you want to train your model
-    MAX_LENGTH = config['max_length'] # it is the resulting tokens length after CLIP text encoder
-    POLICY = config['policy'] # it can be "mlp" or "transformer"
-    MIXED_PRECISION = config['mixed_precision'] # it can be true or false depending if you want to use float16 (instead of float32) using tensor cores of your gpu
-    NUM_WORKERS = config['num_workers']
-    PREFETCH_FACTOR = config['prefetch_factor']
+    with open('./config/model_config.json', 'r') as f:
+        model_config = json.load(f)
+
+    # Training Hyperparameters 
+    NUM_EPOCHS = training_config['num_epochs']
+    BATCH_SIZE = training_config['batch_size']
+    LEARNING_RATE = training_config['learning_rate']
+    DATASETS = training_config['datasets']   # it can be  a list of "libero_10", "libero_90", "libero_spatial", "libero_object", "libero_goal"...
+    TASK_IDS = training_config['task_ids'] # it can be a list of task_ids (from 0 to 9) depending on how much tasks of the datasets you want to train your model
+    MIXED_PRECISION = training_config['mixed_precision'] # it can be true or false depending if you want to use float16 (instead of float32) using tensor cores of your gpu
+    NUM_WORKERS = training_config['num_workers']
+    PREFETCH_FACTOR = training_config['prefetch_factor']
+
+    # Model Hyperparameters
+    FINETUNED_PRED = model_config['finetuned_pred']
+    MAX_LENGTH = model_config['max_length'] # it is the resulting tokens length after CLIP text encoder
+    POLICY = model_config['policy'] # it can be "mlp" or "transformer"
+    NUM_FRAMES = model_config['num_frames']
+    EMBED_DIM = model_config['embed_dim']
+    FROZEN_BACKBONE = model_config['frozen_backbone']
+    TRANSFORMER_LAYERS = model_config['transformer_layers']
+    TRANSFORMER_HEADS = model_config['transformer_heads']
+    TRANSFORMER_FF_DIM = model_config['transformer_ff_dim']
+    TRANSFORMER_DROPOUT = model_config['transformer_dropout']
+    MLP_HIDDEN_DIMS = model_config['mlp_hidden_dims']
+    MLP_DROPOUT = model_config['mlp_dropout']
 
     print("="*40)
     print(f"✅ Training config created!")
@@ -102,7 +116,15 @@ if __name__ == '__main__':
             vjepa_encoder_path=vjepa_path,
             vjepa_predictor_path=predictor_path,
             clip_model_path=clip_path,
-            finetuned_pred=FINETUNED_PRED,
+            embed_dim = EMBED_DIM,
+            transformer_layers = TRANSFORMER_LAYERS,
+            transformer_heads = TRANSFORMER_HEADS,
+            transformer_ff_dim = TRANSFORMER_FF_DIM,
+            transformer_dropout = TRANSFORMER_DROPOUT,
+            mlp_hidden_dims = MLP_HIDDEN_DIMS,
+            mlp_dropout = MLP_DROPOUT,
+            frozen_backbone = FROZEN_BACKBONE,
+            finetuned_pred = FINETUNED_PRED,
             device=device,
         ).to(device)
 
@@ -149,7 +171,8 @@ if __name__ == '__main__':
         optimizer=optimizer,
         loss_fn=loss_fn,
         num_epochs=NUM_EPOCHS,
-        config=config,
+        training_config=training_config,
+        model_config = model_config,
         device=device,
         scaler=scaler,
         results_dir_path=results_dir_path,
