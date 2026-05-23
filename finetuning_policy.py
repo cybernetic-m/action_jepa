@@ -105,7 +105,7 @@ if __name__ == '__main__':
     clip_path = os.path.join(checkpoints_path,"openai/clip-vit-large-patch14")
 
 
-    model_path = './results/policy/results_5/2026_05_22__09_55/best_model.pth'
+    model_path = './results/policy/2026_05_22__09_55/best_model.pth'
     model = torch.load(model_path, map_location='cpu')
     checkpoint = model['model_state_dict']
     
@@ -124,7 +124,7 @@ if __name__ == '__main__':
         finetuned_pred = FINETUNED_PRED,
         device=device,
     ).to(device)
-    
+
     model.load_state_dict(checkpoint, strict=False)
     model.to(device)
     model.print_model_info()
