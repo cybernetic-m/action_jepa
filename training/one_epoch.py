@@ -71,7 +71,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     scaler.unscale_(optimizer)
 
                     if model.policy == 'transformer':
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         
                     scaler.step(optimizer)
                     scaler.update() 
@@ -80,7 +80,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     
                     loss.backward()
                     if model.policy == 'transformer':
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                     optimizer.step()
             
             # Incrementing the loss of the epoch
