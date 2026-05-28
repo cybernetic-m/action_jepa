@@ -9,10 +9,10 @@
     "embed_dim": 1536,
     "frozen_backbone": true,
     "finetuned_pred": false,
-    "transformer_layers": 8,
+    "transformer_layers": 6,
     "transformer_heads": 8,
     "transformer_ff_dim": 2048,
     "transformer_dropout": 0.2,
-    "mlp_hidden_dims": [1024, 512, 256, 128],
-    "mlp_dropout": 0.2
+    "mlp_hidden_dims": [512, 256, 128],
+    "mlp_dropout": 0.1
 }
