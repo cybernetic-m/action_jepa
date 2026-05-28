@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
     "num_epochs": 800,
     "batch_size": 32,
-=======
-    "num_epochs": 100,
-    "batch_size": 64,
->>>>>>> e60437c11f1b3dea9f4493a29ef0d22dc28de200
     "learning_rate": 1e-4,
     "datasets": ["libero_goal"],
     "task_ids": [0],
