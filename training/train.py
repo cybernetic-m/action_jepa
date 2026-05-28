@@ -39,7 +39,7 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     # The SequentialLR after milestones epochs change the scheduler between the two schedulers
     
     scheduler = opti.CosineAnnealingLR(
-        optimizer, T_max=num_epochs, eta_min=1e-5
+        optimizer, T_max=num_epochs, eta_min=1e-6
     )
 
     current_lr = optimizer.param_groups[0]['lr']
@@ -120,18 +120,6 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
             torch.save(checkpoint, model_save_path)
             print(f"🔥 BEST MODEL SAVED! XYZ Err: {current_mae_xyz:.4f} (Epoch {best_epoch})")
         
-        if (epoch + 1) % 10 == 0:
-            last_model_path = os.path.join(training_dir_path, f"last_checkpoint_model.pth")
-            checkpoint = {
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'training_config': training_config,
-                'model_config': model_config
-            }
-            torch.save(checkpoint, last_model_path)
-            print(f"LAST CHECKPOINT MODEL SAVED! (Epoch {epoch+1})")
-
         df_train = pd.DataFrame(train_history).add_suffix('_train')
         df_val = pd.DataFrame(val_history).add_suffix('_val')
 
