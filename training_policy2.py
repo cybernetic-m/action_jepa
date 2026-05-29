@@ -77,7 +77,7 @@ if __name__ == '__main__':
     dataset = PolicyDataset(datasets=DATASETS,
                         task_ids = TASK_IDS,
                         num_frames=NUM_FRAMES,
-                        full_load_ram=False
+                        full_load_ram=True
                         )
     print("Finish Loading Dataset...")
 
