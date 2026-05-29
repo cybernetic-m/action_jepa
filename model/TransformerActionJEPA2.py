@@ -4,6 +4,7 @@ from model.modules.PredictorAC import PredictorAC
 from model.modules.CLIPEncoder import CLIPEncoder
 from model.modules.VJEPAEncoder import VJEPAEncoder
 from model.modules.MLP import MLP
+#from src.models.utils.modules import build_action_block_causal_attention_mask
 
 class TransformerActionJEPA(nn.Module):
     def __init__(self, 
@@ -12,10 +13,16 @@ class TransformerActionJEPA(nn.Module):
                  clip_model_path,
                  num_frames=2,
                  vision_dim = 1408,
-                 language_dim=768,
+                 language_dim = 768,
                  action_dim = 7,
                  joint_dim = 7, 
-                 embed_dim = 1024,
+                 embed_dim = 1536,
+                 transformer_layers = 6,
+                 transformer_heads = 8,
+                 transformer_ff_dim = 2048,
+                 transformer_dropout = 0.1,
+                 mlp_hidden_dims = [512, 256, 128],
+                 mlp_dropout = 0.1,
                  frozen_backbone = True,
                  finetuned_pred = False,
                  device="cuda"):
@@ -31,148 +38,140 @@ class TransformerActionJEPA(nn.Module):
         self.embed_dim = embed_dim
         self.policy = 'transformer'
         self.finetuned_pred = finetuned_pred
-        
-        # Backbone estrattori
+        self.transformer_layers = transformer_layers
+        self.transformer_heads = transformer_heads
+        self.transformer_ff_dim = transformer_ff_dim
+        self.transformer_dropout = transformer_dropout
+        self.mlp_hidden_dims = mlp_hidden_dims
+        self.mlp_dropout = mlp_dropout
+        self.T = self.num_frames // 2
+
+    
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
         self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         
-        # Predittore V-JEPA
         self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, device=device, finetuned_pred = self.finetuned_pred)
   
-        # --- PROIETTORI MLP (Mappatura Non-Lineare) ---
-        # Usiamo MLP a 2 livelli con dimensione nascosta intermedia per rendere forte la proiezione
-        self.joint_proj = MLP(input_dim=joint_dim, hidden_dims=[256], output_dim=embed_dim, dropout=0.1)
-        self.language_proj = MLP(input_dim=language_dim, hidden_dims=[512], output_dim=embed_dim, dropout=0.1)
-        self.vision_proj = MLP(input_dim=vision_dim, hidden_dims=[512], output_dim=embed_dim, dropout=0.1)
-        self.action_proj = MLP(input_dim=action_dim, hidden_dims=[256], output_dim=embed_dim, dropout=0.1) 
+        self.joint_proj = nn.Linear(joint_dim, embed_dim)
+        self.language_proj = nn.Linear(language_dim, embed_dim)
+        self.vision_proj = nn.Linear(vision_dim, embed_dim)
 
-        # Learnable Action Token (Query)
-        self.action_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.action_token = nn.Parameter(torch.randn(1, self.T, embed_dim))
         
-        # Core Transformers (Decoders)
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
-                dim_feedforward=2048, 
-                dropout=0.2, 
+                nhead=self.transformer_heads, 
+                dim_feedforward=self.transformer_ff_dim, 
+                dropout=self.transformer_dropout, 
                 batch_first = True),
-            num_layers = 5
-        )
+            num_layers = self.transformer_layers
+                )
         
         self.refiner = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model=embed_dim, 
-                nhead=8, 
-                dim_feedforward=2048, 
-                dropout=0.2, 
+                nhead=self.transformer_heads, 
+                dim_feedforward=self.transformer_ff_dim, 
+                dropout=self.transformer_dropout, 
                 batch_first = True),
-            num_layers = 5
-        )
+            num_layers = self.transformer_layers
+                )
 
-        # Output Heads
-        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
-        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=[512, 256, 128], output_dim=action_dim, dropout=0.1)
+        self.actor_head = MLP(input_dim=embed_dim, hidden_dims=self.mlp_hidden_dims, output_dim=action_dim, dropout=self.mlp_dropout)
+        self.refiner_head = MLP(input_dim=embed_dim, hidden_dims=self.mlp_hidden_dims, output_dim=action_dim, dropout=self.mlp_dropout)
 
         #self.apply(self._init_weights)
 
     def preprocess_frames(self, vision_input):
         z_frames = self.vision_backbone.preprocess_frames(vision_input)
         z_obs = self.vision_backbone(z_frames)
-        return z_obs 
+        return z_obs
     
     def preprocess_text(self, language_input):
         z_tokens = self.language_backbone.tokenization(language_input)
+        eot_pos = (z_tokens['input_ids'] == self.language_backbone.tokenizer.eos_token_id).int().argmax(dim=-1)
         z_text = self.language_backbone(z_tokens)
-        return z_text 
+        return z_text, eot_pos
     
     def _init_weights(self, layer):
+
+        # Initialize the MLP head weights through HE initialization, while for the projectors we use a normal distribution, all the biases to zero
+        # the trunc normal is used also for linear layers inside the transformers actor and refiner
         if isinstance(layer, nn.Linear):
             if any(name in str(layer) for name in ['actor_head', 'refiner_head']):
                 nn.init.kaiming_normal_(layer.weight, mode='fan_out', nonlinearity='relu')
             else:
                 nn.init.trunc_normal_(layer.weight, std=0.02)
+            
             if layer.bias is not None:
                 nn.init.constant_(layer.bias, 0)
+
+        # LayerNorm layers weights will have bias 0 and weights 1
         elif isinstance(layer, nn.LayerNorm):
             nn.init.constant_(layer.bias, 0)
             nn.init.constant_(layer.weight, 1.0)
+        
+        # For the action token we have normally distributed weights with std 0.02
         elif isinstance(layer, nn.Parameter):
             nn.init.normal_(layer, std=0.02)
 
     def forward(self, language_input, vision_input, joint_input):
         
-        # 1. FEATURE EXTRACTION
-        with torch.no_grad():
-            z_obs = self.preprocess_frames(vision_input)    # (B, N_patches, vision_dim)
-            z_text = self.preprocess_text(language_input)   # (B, seq_len, language_dim)
+        # FEATURE EXTRACTION
         
-        B, N_patches, _ = z_obs.shape
+        with torch.no_grad():
+            z_obs = self.preprocess_frames(vision_input)
+            z_text, eot_pos = self.preprocess_text(language_input)
+        
+        B, N, D = z_obs.shape   # B = Batch, N = num of tokens, D = dim of each token
 
-        # 2. PROIEZIONE TRAMITE I TUOI NUOVI MODULI MLP
-        # PyTorch applica l'MLP sull'ultima dimensione preservando (B, N_patches) e (B, seq_len)
-        z_obs_proj = self.vision_proj(z_obs)                    # (B, N_patches, embed_dim)
-        z_text_proj = self.language_proj(z_text)                # (B, seq_len, embed_dim)
-        z_joint_proj = self.joint_proj(joint_input).unsqueeze(1) # (B, 1, embed_dim)
+        # END OF TOKEN EMBEDDING
+        eot_embedding = z_text[torch.arange(B), eot_pos]
 
-        action_token = self.action_token.expand(B, -1, -1)      # (B, 1, embed_dim)
+        # PROJECTION
+        z_obs_proj = self.vision_proj(z_obs)
+        z_text_proj = self.language_proj(eot_embedding).unsqueeze(1)
+        z_joint_proj = self.joint_proj(joint_input).unsqueeze(1)
 
-        # 3. STADIO ACTOR
-        actor_context = torch.cat([z_obs_proj, z_text_proj, z_joint_proj], dim=1) # (B, N_patches + seq_len + 1, embed_dim)
+        # batching the action token
+        action_token = self.action_token.expand(B, -1, -1)
+
+        # ATTENTION TEXT*PATCHES
+        attn_logits = torch.bmm(z_obs_proj, z_text_proj.transpose(1, 2)) 
+        attn_weights = torch.softmax(attn_logits, dim=1)
+        z_obs_attention = torch.sum(z_obs_proj * attn_weights, dim=1, keepdim=True) 
+
+        # ACTOR 
+        actor_context = torch.cat([z_obs_attention, z_text_proj, z_joint_proj], dim=1)
         latent_actor_action = self.actor(action_token, actor_context)
-        actor_action = self.actor_head(latent_actor_action.squeeze(1)) # (B, action_dim)
-
-        # 4. PROIEZIONE MLP DELL'AZIONE DELL'ACTOR PER IL REFINER
-        actor_action_embedded = self.action_proj(actor_action).unsqueeze(1) # (B, 1, embed_dim)
+        actor_action = self.actor_head(latent_actor_action.view(B*self.T, -1))
+        actor_action = actor_action.view(B, self.T, self.action_dim)
        
-        # 5. PREDIZIONE DI JEPA
+        # PREDICTOR
         with torch.no_grad():
-            z_pred, _, _ = self.predictor(z_obs, actor_action.unsqueeze(1)) 
-        z_pred_proj = self.vision_proj(z_pred) # (B, N_patches, embed_dim) -> Passa anche lui per l'MLP della visione
+            z_pred, _, _ = self.predictor(z_obs, actor_action)
+        z_pred_proj = self.vision_proj(z_pred)
+        z_pred_attention = torch.sum(z_pred_proj * attn_weights, dim=1, keepdim=True)
         
-        # 6. STADIO REFINER
-        refiner_context = torch.cat([
-            z_obs_proj,             
-            z_pred_proj,            
-            z_text_proj,            
-            z_joint_proj,           
-            actor_action_embedded   
-        ], dim=1)
-        
+        # REFINER
+        refiner_context = torch.cat([z_obs_attention, z_pred_attention, z_text_proj, z_joint_proj], dim=1)
         latent_refiner_action = self.refiner(action_token, refiner_context)
-        refiner_action = self.refiner_head(latent_refiner_action.squeeze(1)) # (B, action_dim)
+        refiner_action = self.refiner_head(latent_refiner_action.view(B*self.T, -1))
+        refiner_action = refiner_action.view(B, self.T, self.action_dim)
 
         return actor_action, refiner_action
     
     def print_model_info(self):
-        print("="*60)
-        print("                  MODEL ARCHITECTURE INFO                  ")
-        print("="*60 + "\n")
-        
-        print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}")
-        print(f"LANGUAGE BACKBONE: {self.language_backbone.__class__.__name__}\n")
-        
-        print(f"ACTION TOKEN SHAPE: {self.action_token.shape}\n")
-        
-        print(f"LATENT PREDICTOR: {self.predictor.__class__.__name__}\n")
-        
-        print("-" * 50)
-        print("MULTIMODAL PROJECTORS (MLP)")
-        print("-" * 50)
-        print(f"VISION PROJECTOR:\n{self.vision_proj}")
-        print(f"LANGUAGE PROJECTOR:\n{self.language_proj}")
-        print(f"JOINT PROJECTOR:\n{self.joint_proj}")
-        print(f"ACTION PROJECTOR:\n{self.action_proj}\n")
-        
-        print("-" * 50)
-        print("TRANSFORMER DECODERS")
-        print("-" * 50)
-        print(f"ACTOR DECODER:\n{self.actor}")
-        print(f"REFINER DECODER:\n{self.refiner}\n")
-        
-        print("-" * 50)
-        print("OUTPUT HEADS (MLP)")
-        print("-" * 50)
-        print(f"ACTOR HEAD:\n{self.actor_head}")
-        print(f"REFINER HEAD:\n{self.refiner_head}")
-        print("="*60 + "\n")
+        print("MODEL INFO:\n")
+        print(f"VISION BACKBONE: {self.vision_backbone.__class__.__name__}\n{self.vision_backbone}")
+        print(f"LANGUAGE BACKBONE {self.language_backbone.__class__.__name__}\n{self.language_backbone}")
+        print(f"LEARNABLE ACTION TOKEN:\n{self.action_token.shape}")
+        print(f"PREDICTOR LAYERS:\n{self.predictor.__class__.__name__}\n{self.predictor}")
+        print(f"LANGUAGE PROJECTOR LAYERS:\n{self.language_proj}")
+        print(f"VISION PROJECTOR LAYERS:\n{self.vision_proj}")
+        print(f"JOINT PROJECTOR LAYERS:\n{self.joint_proj}")
+        print(f"ACTOR LAYERS:\n{self.actor}")
+        print(f"REFINER LAYERS:\n{self.refiner}")
+        print(f"ACTOR HEAD LAYERS:\n{self.actor_head}")
+        print(f"REFINER HEAD LAYERS:\n{self.refiner_head}")
