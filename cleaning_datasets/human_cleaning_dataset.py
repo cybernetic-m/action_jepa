@@ -8,9 +8,12 @@ import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 root_path = os.path.abspath(os.path.join(script_dir, "../"))
+utils_dir = os.path.join(root_path, 'utils')
 
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
+if utils_dir not in sys.path:
+    sys.path.insert(0, utils_dir)
 
 import glob
 import cv2
