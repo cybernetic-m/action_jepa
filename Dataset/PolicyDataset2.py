@@ -71,9 +71,13 @@ class PolicyDataset(Dataset):
         else:
             available_frames = frames[start_idx:]
             pad_size = self.num_frames - available_frames.shape[0]
-            last_frame = available_frames[-1:]
-            pad_frames = np.repeat(last_frame, pad_size, axis=0)
-            vision_input = np.concatenate([available_frames, pad_frames], axis=0)
+            
+            if pad_size > 0:
+                last_frame = available_frames[-1:]
+                pad_frames = np.repeat(last_frame, pad_size, axis=0)
+                vision_input = np.concatenate([available_frames, pad_frames], axis=0)
+            else:
+                vision_input = available_frames[:self.num_frames]
         vision_input = torch.from_numpy(vision_input).byte()
         
         text_instruction = demo['text_instruction']
@@ -86,9 +90,13 @@ class PolicyDataset(Dataset):
         else:
             available_actions = actions[start_idx:]
             pad_size = self.T - available_actions.shape[0]
-            last_action = available_actions[-1:]
-            pad_actions = last_action.repeat(pad_size, 1)
-            action_output = torch.cat([available_actions, pad_actions], dim=0)
+            
+            if pad_size > 0:
+                last_action = available_actions[-1:]
+                pad_actions = last_action.repeat(pad_size, 1)
+                action_output = torch.cat([available_actions, pad_actions], dim=0)
+            else:
+                action_output = available_actions[:self.T]
         
         joint_states = demo['joint_states'].float()
         joint_input = joint_states[start_idx]

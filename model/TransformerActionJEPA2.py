@@ -150,6 +150,8 @@ class TransformerActionJEPA(nn.Module):
        
         # PREDICTOR
         with torch.no_grad():
+            print(z_obs.shape)
+            print(actor_action.shape)
             z_pred, _, _ = self.predictor(z_obs, actor_action)
         z_pred_proj = self.vision_proj(z_pred)
         z_pred_attention = torch.sum(z_pred_proj * attn_weights, dim=1, keepdim=True)

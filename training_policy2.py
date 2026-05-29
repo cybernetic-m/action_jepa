@@ -105,6 +105,7 @@ if __name__ == '__main__':
         vjepa_encoder_path=vjepa_path,
         vjepa_predictor_path=predictor_path,
         clip_model_path=clip_path,
+        num_frames=NUM_FRAMES,
         embed_dim = EMBED_DIM,
         transformer_layers = TRANSFORMER_LAYERS,
         transformer_heads = TRANSFORMER_HEADS,
