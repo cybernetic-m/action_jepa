@@ -176,3 +176,21 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
                     scaler.step(optimizer)
                     scaler.update() 
                 else:
+                    loss.backward()
+                    optimizer.step()
+            
+            epoch_loss += loss.item()
+            
+            if is_main_process:
+                pbar.set_postfix({
+                    'loss': f"{loss.item():.4f}",
+                })
+        
+        loss_epoch_avg = epoch_loss / len(dataloader)
+        
+        # All-Reduce anche per la loss del predictor
+        metrics = {
+            'loss': reduce_tensor(loss_epoch_avg),
+        }
+    
+    return metrics
