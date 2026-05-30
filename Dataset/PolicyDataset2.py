@@ -45,6 +45,7 @@ class PolicyDataset(Dataset):
             frames_len = data['frames'].shape[0]
             actions_len = data['actions'].shape[0]
 
+            '''
             if frames_len != actions_len:
                 discrepancies_count += 1
                 # Stampiamo solo i primi 5 per evitare di intasare il terminale, ma li contiamo tutti
@@ -53,6 +54,7 @@ class PolicyDataset(Dataset):
                     print(f"    --> Lunghezza FRAMES:  {frames_len}")
                     print(f"    --> Lunghezza ACTIONS: {actions_len}")
                     print(f"    --> Differenza:        {actions_len - frames_len} elementi")
+            '''
 
             steps = frames_len
             
@@ -95,29 +97,32 @@ class PolicyDataset(Dataset):
             vision_input = np.concatenate([pad_frames, available_frames], axis=0)
 
         
-        vision_input = torch.from_numpy(vision_input).byte()
-        
-        end_action_idx = current_idx + self.T
-        
-        if end_action_idx <= total_steps:
-            
-            action_output = actions[current_idx : end_action_idx]
-        else:
-            available_actions = actions[current_idx:]
-            pad_size = self.T - available_actions.shape[0]
-            
-            last_action = actions[-1:] 
-            pad_actions = last_action.repeat(pad_size, 1)
+        vision_input = torch.from_numpy(vision_input).byte().clone()
+
+        available_actions = actions[current_idx : current_idx + self.T]
+        num_extracted = available_actions.shape[0]
+
+        if num_extracted == self.T:
+            action_output = available_actions
+        elif num_extracted > 0:
+            pad_size = self.T - num_extracted
+            last_valid_action = available_actions[-1:] 
+            pad_actions = last_valid_action.repeat(pad_size, 1)
             action_output = torch.cat([available_actions, pad_actions], dim=0)
-  
+        else:
+            last_absolute_action = actions[-1:] 
+            action_output = last_absolute_action.repeat(self.T, 1)
+        
+        action_output = action_output[:self.T]
+
         joint_input = joint_states[current_idx]
         
         text_instruction = demo['text_instruction']
  
         return {
-            'vision_input': vision_input,     # Shape: [num_frames, H, W, C]
-            'text_input': text_instruction,   # Stringa o token
-            'joint_input': joint_input,       # Shape: [num_joints]
-            'action_seq_target': action_output # Shape: [T, 7]
+            'vision_input': vision_input,     
+            'text_input': text_instruction,   
+            'joint_input': joint_input,       
+            'action_seq_target': action_output 
         }
 
