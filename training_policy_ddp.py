@@ -139,6 +139,7 @@ if __name__ == '__main__':
         finetuned_pred=FINETUNED_PRED,
         device='cpu',
     )
+    model.to('cpu')
 
     if hasattr(model.language_backbone.clip_model, "logit_scale"):
         # Unsqueeze(0) aggiunge la dimensione mancante richiesta da FSDP
