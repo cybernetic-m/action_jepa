@@ -140,6 +140,16 @@ if __name__ == '__main__':
         device=device,
     )
 
+    if hasattr(model.language_backbone.clip_model, "logit_scale"):
+        # Unsqueeze(0) aggiunge la dimensione mancante richiesta da FSDP
+        model.language_backbone.clip_model.logit_scale = nn.Parameter(
+            model.language_backbone.clip_model.logit_scale.unsqueeze(0)
+        )
+    # ==========================================================================
+
+    # 2. Ora lo passi a FSDP, che non troverà più parametri a 0 dimensioni e partirà felice
+    auto_wrap_policy = size_based_auto_wrap_policy
+
     # --- MODIFICATO: Configurazione della precisione mista fissa per i pesi FSDP ---
     fsdp_mixed_precision = MixedPrecision(
         param_dtype=torch.float16,     # Riduce l'occupazione dei pesi in VRAM a 16-bit
@@ -155,10 +165,9 @@ if __name__ == '__main__':
         auto_wrap_policy=auto_wrap_policy,
         sharding_strategy=ShardingStrategy.SHARD_GRAD_OP,
         cpu_offload=CPUOffload(offload_params=True),
-        mixed_precision=fsdp_mixed_precision, # Attiva MixedPrecision a livello di parametri
+        mixed_precision=fsdp_mixed_precision,
         sync_module_states=True
     )
-    # -------------------------------------------------------------------------------------
 
     if is_main_process:
         model._fsdp_wrapped_module.print_model_info() 
