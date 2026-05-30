@@ -2,9 +2,7 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from torch.amp import autocast
-# --- IMPORT PER LA SINCRONIZZAZIONE DELLE METRICHE ---
 import torch.distributed as dist
-# -----------------------------------------------------
 
 def reduce_tensor(tensor):
     """Sincronizza e fa la media di un tensore/valore tra tutte le GPU."""
@@ -43,8 +41,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
     epoch_mae_gripper = 0 
     epoch_cosim_ori = 0 
 
-    # 1. Mostriamo la barra tqdm SOLO sulla GPU principale (rank 0)
-    # disable=not is_main_process evita di duplicare l'output nel terminale
+    # Mostriamo la barra tqdm SOLO sulla GPU principale (rank 0)
     pbar = tqdm(
         dataloader, 
         desc=f"Validation" if validation else "Training",
@@ -81,19 +78,22 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
 
-                    # Quando usiamo DDP, per accedere alle proprietà del tuo modello transformer 
-                    # dobbiamo usare model.module (perché model è un wrapper DDP)
-                    policy_type = model.module.policy if is_distributed else model.policy
+                    # --- AGGIORNATO PER FSDP: Accesso alle proprietà tramite _fsdp_wrapped_module ---
+                    policy_type = model._fsdp_wrapped_module.policy if is_distributed else model.policy
                     if policy_type == 'transformer':
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                        # Sotto FSDP si chiama direttamente la funzione nativa del wrapper
+                        model.clip_grad_norm_(max_norm=1.0)
         
                     scaler.step(optimizer)
                     scaler.update() 
                 else:
                     loss.backward()
-                    policy_type = model.module.policy if is_distributed else model.policy
+                    
+                    # --- AGGIORNATO PER FSDP: Accesso alle proprietà tramite _fsdp_wrapped_module ---
+                    policy_type = model._fsdp_wrapped_module.policy if is_distributed else model.policy
                     if policy_type == 'transformer':
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                        model.clip_grad_norm_(max_norm=1.0)
+                        
                     optimizer.step()
             
             epoch_loss += loss.item()
@@ -110,7 +110,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     'refiner': f"{loss_refiner.item():.4f}",
                 })
         
-        # 2. Calcolo della media locale per l'istanza corrente
+        # Calcolo della media locale per l'istanza corrente
         num_batches = len(dataloader)
         loss_epoch_avg = epoch_loss / num_batches
         loss_epoch_actor_avg = epoch_loss_actor / num_batches
@@ -119,8 +119,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
         epoch_mae_gripper = epoch_mae_gripper / num_batches
         epoch_cosim_ori = epoch_cosim_ori / num_batches
 
-        # 3. SINCRONIZZAZIONE ALL-REDUCE (Fondamentale in DDP)
-        # Uniamo i risultati parziali di tutte le GPU per calcolare la metrica reale globale
+        # Sincronizzazione All-Reduce per calcolare le metriche globali reali
         metrics = {
             'loss': reduce_tensor(loss_epoch_avg),
             'loss_actor': reduce_tensor(loss_epoch_actor_avg),
@@ -177,21 +176,3 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
                     scaler.step(optimizer)
                     scaler.update() 
                 else:
-                    loss.backward()
-                    optimizer.step()
-            
-            epoch_loss += loss.item()
-            
-            if is_main_process:
-                pbar.set_postfix({
-                    'loss': f"{loss.item():.4f}",
-                })
-        
-        loss_epoch_avg = epoch_loss / len(dataloader)
-        
-        # All-Reduce anche per la loss del predictor
-        metrics = {
-            'loss': reduce_tensor(loss_epoch_avg),
-        }
-    
-    return metrics

@@ -5,7 +5,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
+# --- MODIFICATO: Rimossi gli import di DDP e aggiunti quelli di FSDP ---
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
+# ----------------------------------------------------------------------
 from torch.utils.data.distributed import DistributedSampler
 from Dataset.PolicyDataset2 import PolicyDataset
 from model.TransformerActionJEPA2 import TransformerActionJEPA
@@ -117,7 +120,7 @@ if __name__ == '__main__':
         predictor_path = os.path.join(checkpoints_path, "facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
     clip_path = os.path.join(checkpoints_path, "openai/clip-vit-large-patch14")
 
-    
+    # Inizializzazione del modello grezzo (nota: .to(device) o .to(local_rank) va fatto PRIMA di FSDP)
     model = TransformerActionJEPA(
         vjepa_encoder_path=vjepa_path,
         vjepa_predictor_path=predictor_path,
@@ -135,18 +138,30 @@ if __name__ == '__main__':
         device=device,
     ).to(device)
 
+    # --- MODIFICATO: Sostituito il wrapper DDP con il wrapper FSDP ---
+    # Definiamo una policy automatica basata sulla dimensione dei blocchi per frammentare i layer del Transformer
+    auto_wrap_policy = size_based_auto_wrap_policy
     
-    model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+    model = FSDP(
+        model, 
+        device_id=torch.cuda.current_device(),
+        auto_wrap_policy=auto_wrap_policy
+    )
+    # ------------------------------------------------------------------
 
     if is_main_process:
-        model.module.print_model_info() # .module serve ad accedere ai metodi nativi sotto il wrapper DDP
+        # Sotto FSDP, la vecchia chiamata a .module diventa ._fsdp_wrapped_module
+        model._fsdp_wrapped_module.print_model_info() 
 
     results_dir_path = "./results/policy"
     if is_main_process:
         os.makedirs(results_dir_path, exist_ok=True)
 
     loss_fn = nn.MSELoss()
+    
+    # --- CRUCIALE: L'ottimizzatore è stato spostato DOPO l'avvolgimento FSDP ---
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    # --------------------------------------------------------------------------
 
     if MIXED_PRECISION:
         scaler = GradScaler()
@@ -178,7 +193,6 @@ if __name__ == '__main__':
         persistent_workers=True
     )
     
-    
     training_dir_path = train_policy(
         model=model,
         train_loader=train_loader,
@@ -193,5 +207,4 @@ if __name__ == '__main__':
         results_dir_path=results_dir_path,
     )
 
-    
     cleanup_ddp()
