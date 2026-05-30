@@ -137,7 +137,7 @@ if __name__ == '__main__':
         mlp_dropout=MLP_DROPOUT,
         frozen_backbone=FROZEN_BACKBONE,
         finetuned_pred=FINETUNED_PRED,
-        device=device,
+        device='cpus',
     )
 
     if hasattr(model.language_backbone.clip_model, "logit_scale"):
