@@ -54,7 +54,7 @@ class PolicyDataset(Dataset):
     
     def __getitem__(self, index):
 
-        data_idx, start_idx = self.window_indices[index]
+        data_idx, current_idx = self.window_indices[index] 
 
         if self.full_load_ram:
             demo = self.loaded_demos[data_idx]
@@ -62,48 +62,49 @@ class PolicyDataset(Dataset):
             demo_path = self.file_paths[data_idx]
             demo = torch.load(demo_path, map_location='cpu', weights_only=False)
         
-        frames = demo['frames']
+        frames = demo['frames']        
+        actions = demo['actions'].float()      
+        joint_states = demo['joint_states'].float()
+        
         total_steps = frames.shape[0]
-        end_idx = start_idx + self.num_frames
 
-        if end_idx <= total_steps:
-            vision_input = frames[start_idx:end_idx]
+        start_frame_idx = current_idx - self.num_frames + 1
+        
+        if start_frame_idx >= 0:
+            vision_input = frames[start_frame_idx : current_idx + 1]
         else:
-            available_frames = frames[start_idx:]
+            available_frames = frames[0 : current_idx + 1]
             pad_size = self.num_frames - available_frames.shape[0]
             
-            if pad_size > 0:
-                last_frame = available_frames[-1:]
-                pad_frames = np.repeat(last_frame, pad_size, axis=0)
-                vision_input = np.concatenate([available_frames, pad_frames], axis=0)
-            else:
-                vision_input = available_frames[:self.num_frames]
+            first_frame = frames[0:1] 
+            
+            pad_frames = np.repeat(first_frame, pad_size, axis=0)
+            vision_input = np.concatenate([pad_frames, available_frames], axis=0)
+
+        
         vision_input = torch.from_numpy(vision_input).byte()
         
-        text_instruction = demo['text_instruction']
-        
-        actions = demo['actions'].float()
-        end_action_idx = start_idx + self.T
+        end_action_idx = current_idx + self.T
         
         if end_action_idx <= total_steps:
-            action_output = actions[start_idx:end_action_idx]
+            
+            action_output = actions[current_idx : end_action_idx]
         else:
-            available_actions = actions[start_idx:]
+            available_actions = actions[current_idx:]
             pad_size = self.T - available_actions.shape[0]
             
-            if pad_size > 0:
-                last_action = available_actions[-1:]
-                pad_actions = last_action.repeat(pad_size, 1)
-                action_output = torch.cat([available_actions, pad_actions], dim=0)
-            else:
-                action_output = available_actions[:self.T]
+            last_action = actions[-1:] 
+            pad_actions = last_action.repeat(pad_size, 1)
+            action_output = torch.cat([available_actions, pad_actions], dim=0)
+  
+        joint_input = joint_states[current_idx]
         
-        joint_states = demo['joint_states'].float()
-        joint_input = joint_states[start_idx]
+        text_instruction = demo['text_instruction']
  
-        return {'vision_input': vision_input,
-                'text_input': text_instruction,
-                'joint_input': joint_input,
-                'action_seq_target': action_output,
-                } 
+        return {
+            'vision_input': vision_input,     # Shape: [num_frames, H, W, C]
+            'text_input': text_instruction,   # Stringa o token
+            'joint_input': joint_input,       # Shape: [num_joints]
+            'action_seq_target': action_output # Shape: [T, 7]
+        }
 
