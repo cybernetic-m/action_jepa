@@ -159,6 +159,11 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
             frames_next = batch['frames_next'].to(device)
             action = batch['action'].to(device).unsqueeze(1)
 
+            if scaler is not None or dist.is_initialized():
+                vision_input = vision_input.half()
+                if torch.is_tensor(joint_input):
+                    joint_input = joint_input.half()
+
             with autocast(device_type='cuda', enabled=('cuda' in str(device))):
                 with torch.no_grad():
                     z_obs_current = vjepa_encoder(frames_current)
