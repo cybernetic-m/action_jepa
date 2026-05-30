@@ -143,6 +143,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
           frames = []
           joint_states = []
           zero_action = [0.0]*7
+          executed_actions = []
           
           obs, _, _, _ = env.step(zero_action)
           frame = np.flip(obs["agentview_image"], axis=0)
@@ -158,6 +159,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
               
               frames.append(frame)
               joint_states.append(obs["robot0_joint_pos"])
+              executed_actions.append(actions[i])
 
               if done: 
                 break
@@ -168,7 +170,7 @@ def resample_data(hdf5_path, output_dir, task_id, task_suite_name):
               'frames': np.array(frames, dtype=np.uint8),
               'text_instruction': text_instruction,
               'joint_states': torch.from_numpy(np.array(joint_states)).float(),
-              'actions': torch.tensor(actions, dtype=torch.float32)
+              'actions': torch.tensor(executed_actions, dtype=torch.float32)
           }
 
         

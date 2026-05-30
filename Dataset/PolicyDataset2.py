@@ -16,6 +16,7 @@ class PolicyDataset(Dataset):
         self.full_load_ram = full_load_ram
         self.num_frames = num_frames
         self.T = self.num_frames // 2
+        discrepancies_count = 0
         
         for dataset in self.datasets:
             for task_id in self.task_ids:
@@ -41,11 +42,19 @@ class PolicyDataset(Dataset):
 
             #self.all_actions.append(data['actions'].float())
 
-            steps = data['frames'].shape[0] 
             frames_len = data['frames'].shape[0]
             actions_len = data['actions'].shape[0]
-            print(f"    --> Lunghezza FRAMES:  {frames_len}")
-            print(f"    --> Lunghezza ACTIONS: {actions_len}")
+
+            if frames_len != actions_len:
+                discrepancies_count += 1
+                # Stampiamo solo i primi 5 per evitare di intasare il terminale, ma li contiamo tutti
+                if discrepancies_count <= 5:
+                    print(f"\n[!] Discrepanza rilevata nel file: {path}")
+                    print(f"    --> Lunghezza FRAMES:  {frames_len}")
+                    print(f"    --> Lunghezza ACTIONS: {actions_len}")
+                    print(f"    --> Differenza:        {actions_len - frames_len} elementi")
+
+            steps = frames_len
             
             for start_idx in range(0, steps):
                 self.window_indices.append((data_idx,start_idx))

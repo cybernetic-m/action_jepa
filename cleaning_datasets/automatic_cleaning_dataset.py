@@ -41,6 +41,7 @@ def auto_cleaning_dataset(resampled_data_dir, json_dict_path):
 if __name__ == "__main__":
 
     resampled_data_dir = '../resampled_data'
-    json_path = './libero_goal.json' 
+    json_paths = ['./libero_goal.json', './libero_10.json', './libero_object.json', './libero_spatial.json']
     
-    auto_cleaning_dataset(resampled_data_dir, json_path)
+    for path in json_paths:
+        auto_cleaning_dataset(resampled_data_dir, path)
