@@ -5,9 +5,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import torch.distributed as dist
-# --- MODIFICATO: Rimossi gli import di DDP e aggiunti quelli di FSDP ---
+# --- MODIFICATO: Aggiunto l'import di CPUOffload per proteggere la VRAM ---
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
+from torch.distributed.fsdp import CPUOffload
 # ----------------------------------------------------------------------
 from torch.utils.data.distributed import DistributedSampler
 from Dataset.PolicyDataset2 import PolicyDataset
@@ -35,7 +36,7 @@ def cleanup_ddp():
 if __name__ == '__main__':
 
     local_rank, rank, world_size = setup_ddp()
-    is_main_process = (rank == 0) # Identifica se è la GPU principale (GPU 0)
+    is_main_process = (rank == 0) 
 
     seed = 46 + rank 
     torch.manual_seed(seed)
@@ -120,7 +121,7 @@ if __name__ == '__main__':
         predictor_path = os.path.join(checkpoints_path, "facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
     clip_path = os.path.join(checkpoints_path, "openai/clip-vit-large-patch14")
 
-    # Inizializzazione del modello grezzo (nota: .to(device) o .to(local_rank) va fatto PRIMA di FSDP)
+    # --- MODIFICATO: Istanziamo il modello lasciandolo su CPU (Rimosso .to(device)) ---
     model = TransformerActionJEPA(
         vjepa_encoder_path=vjepa_path,
         vjepa_predictor_path=predictor_path,
@@ -136,21 +137,21 @@ if __name__ == '__main__':
         frozen_backbone=FROZEN_BACKBONE,
         finetuned_pred=FINETUNED_PRED,
         device=device,
-    ).to(device)
+    )
+    # ---------------------------------------------------------------------------------
 
-    # --- MODIFICATO: Sostituito il wrapper DDP con il wrapper FSDP ---
-    # Definiamo una policy automatica basata sulla dimensione dei blocchi per frammentare i layer del Transformer
+    # --- MODIFICATO: Avvolgimento FSDP con CPU Offload attivato per evitare picchi OOM ---
     auto_wrap_policy = size_based_auto_wrap_policy
     
     model = FSDP(
         model, 
         device_id=torch.cuda.current_device(),
-        auto_wrap_policy=auto_wrap_policy
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=CPUOffload(offload_params=True) # Esegue il flatten dei pesi sulla RAM di sistema
     )
-    # ------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------
 
     if is_main_process:
-        # Sotto FSDP, la vecchia chiamata a .module diventa ._fsdp_wrapped_module
         model._fsdp_wrapped_module.print_model_info() 
 
     results_dir_path = "./results/policy"
@@ -159,9 +160,8 @@ if __name__ == '__main__':
 
     loss_fn = nn.MSELoss()
     
-    # --- CRUCIALE: L'ottimizzatore è stato spostato DOPO l'avvolgimento FSDP ---
+    # L'ottimizzatore viene agganciato adesso che i parametri sono stati shardati correttamente
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
-    # --------------------------------------------------------------------------
 
     if MIXED_PRECISION:
         scaler = GradScaler()
