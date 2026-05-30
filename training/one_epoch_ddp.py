@@ -57,6 +57,12 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             action_seq_target = batch['action_seq_target'].to(device)
             
             with autocast(device_type='cuda', enabled=('cuda' in str(device))):
+                # --- MODIFICATO: Forza il formato float16 (half) degli input dentro autocast ---
+                vision_input = vision_input.half()
+                if torch.is_tensor(joint_input):
+                    joint_input = joint_input.half()
+                # ------------------------------------------------------------------------------
+                
                 actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
 
                 loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
@@ -78,10 +84,8 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
 
-                    # --- AGGIORNATO PER FSDP: Accesso alle proprietà tramite _fsdp_wrapped_module ---
                     policy_type = model._fsdp_wrapped_module.policy if is_distributed else model.policy
                     if policy_type == 'transformer':
-                        # Sotto FSDP si chiama direttamente la funzione nativa del wrapper
                         model.clip_grad_norm_(max_norm=1.0)
         
                     scaler.step(optimizer)
@@ -89,7 +93,6 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                 else:
                     loss.backward()
                     
-                    # --- AGGIORNATO PER FSDP: Accesso alle proprietà tramite _fsdp_wrapped_module ---
                     policy_type = model._fsdp_wrapped_module.policy if is_distributed else model.policy
                     if policy_type == 'transformer':
                         model.clip_grad_norm_(max_norm=1.0)
@@ -110,7 +113,6 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                     'refiner': f"{loss_refiner.item():.4f}",
                 })
         
-        # Calcolo della media locale per l'istanza corrente
         num_batches = len(dataloader)
         loss_epoch_avg = epoch_loss / num_batches
         loss_epoch_actor_avg = epoch_loss_actor / num_batches
@@ -119,7 +121,6 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
         epoch_mae_gripper = epoch_mae_gripper / num_batches
         epoch_cosim_ori = epoch_cosim_ori / num_batches
 
-        # Sincronizzazione All-Reduce per calcolare le metriche globali reali
         metrics = {
             'loss': reduce_tensor(loss_epoch_avg),
             'loss_actor': reduce_tensor(loss_epoch_actor_avg),
@@ -159,12 +160,13 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
             frames_next = batch['frames_next'].to(device)
             action = batch['action'].to(device).unsqueeze(1)
 
-            if scaler is not None or dist.is_initialized():
-                vision_input = vision_input.half()
-                if torch.is_tensor(joint_input):
-                    joint_input = joint_input.half()
-
             with autocast(device_type='cuda', enabled=('cuda' in str(device))):
+                # --- MODIFICATO: Allineamento tipo anche per il modulo predictor ---
+                frames_current = frames_current.half()
+                frames_next = frames_next.half()
+                action = action.half()
+                # ------------------------------------------------------------------
+                
                 with torch.no_grad():
                     z_obs_current = vjepa_encoder(frames_current)
                     z_obs_next = vjepa_encoder(frames_next)
@@ -193,7 +195,6 @@ def one_epoch_pred(predictor, vjepa_encoder, dataloader, optimizer, loss_fn, dev
         
         loss_epoch_avg = epoch_loss / len(dataloader)
         
-        # All-Reduce anche per la loss del predictor
         metrics = {
             'loss': reduce_tensor(loss_epoch_avg),
         }
