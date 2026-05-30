@@ -56,15 +56,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             joint_input = batch['joint_input'].to(device)
             action_seq_target = batch['action_seq_target'].to(device)
             
-            with autocast(device_type='cuda', enabled=('cuda' in str(device))):
-                # --- MODIFICATO: Forza il formato float16 (half) degli input dentro autocast ---
-                vision_input = vision_input.half()
-                if torch.is_tensor(joint_input):
-                    joint_input = joint_input.half()
-                # ------------------------------------------------------------------------------
-                
+            with autocast(device_type='cuda', dtype=torch.bfloat16, enabled=('cuda' in str(device))):
                 actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
-
+                
                 loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
                 loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
                 loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner)

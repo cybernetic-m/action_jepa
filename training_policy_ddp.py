@@ -153,9 +153,9 @@ if __name__ == '__main__':
 
     # --- MODIFICATO: Configurazione della precisione mista fissa per i pesi FSDP ---
     fsdp_mixed_precision = MixedPrecision(
-        param_dtype=torch.float16,     # Riduce l'occupazione dei pesi in VRAM a 16-bit
-        reduce_dtype=torch.float16,    # Esegue la riduzione dei gradienti a 16-bit
-        buffer_dtype=torch.float16,
+        param_dtype=torch.bfloat16,     # Forza tutti i pesi/bias interni in bfloat16
+        reduce_dtype=torch.bfloat16,    # Sincronizza i gradienti in bfloat16
+        buffer_dtype=torch.bfloat16,    # Converte anche i buffer interni (risolve il crash del bias)
     )
 
     auto_wrap_policy = size_based_auto_wrap_policy
@@ -166,7 +166,7 @@ if __name__ == '__main__':
         auto_wrap_policy=auto_wrap_policy,
         sharding_strategy=ShardingStrategy.SHARD_GRAD_OP, # Sfrutta ZeRO-2 per gradienti e ottimizzatore
         cpu_offload=None, # <--- IMPOSTA A NONE (Rimuove il blocco di controllo CPU/CUDA)
-        mixed_precision=None,
+        mixed_precision=fsdp_mixed_precision,
         sync_module_states=True
     )
 
