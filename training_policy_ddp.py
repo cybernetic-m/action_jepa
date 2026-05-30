@@ -5,11 +5,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import torch.distributed as dist
-# --- MODIFICATO: Aggiunto l'import di ShardingStrategy ---
+# --- MODIFICATO: Aggiunto l'import di MixedPrecision per FSDP ---
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp import CPUOffload
 from torch.distributed.fsdp import ShardingStrategy
+from torch.distributed.fsdp import MixedPrecision
 # ----------------------------------------------------------------------
 from torch.utils.data.distributed import DistributedSampler
 from Dataset.PolicyDataset2 import PolicyDataset
@@ -139,15 +140,23 @@ if __name__ == '__main__':
         device=device,
     )
 
-    # --- MODIFICATO: Configurato FSDP con SHARD_GRAD_OP (ZeRO-2) per stabilizzare la VRAM ---
+    # --- MODIFICATO: Configurazione della precisione mista fissa per i pesi FSDP ---
+    fsdp_mixed_precision = MixedPrecision(
+        param_dtype=torch.float16,     # Riduce l'occupazione dei pesi in VRAM a 16-bit
+        reduce_dtype=torch.float16,    # Esegue la riduzione dei gradienti a 16-bit
+        buffer_dtype=torch.float16,
+    )
+
     auto_wrap_policy = size_based_auto_wrap_policy
     
     model = FSDP(
         model, 
         device_id=torch.cuda.current_device(),
         auto_wrap_policy=auto_wrap_policy,
-        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP, # Evita il picco di allocazione iniziale dello shard
-        cpu_offload=CPUOffload(offload_params=True)
+        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP,
+        cpu_offload=CPUOffload(offload_params=True),
+        mixed_precision=fsdp_mixed_precision, # Attiva MixedPrecision a livello di parametri
+        sync_module_states=True
     )
     # -------------------------------------------------------------------------------------
 
