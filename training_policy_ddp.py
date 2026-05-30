@@ -164,8 +164,8 @@ if __name__ == '__main__':
         model, 
         device_id=torch.cuda.current_device(),
         auto_wrap_policy=auto_wrap_policy,
-        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP,
-        cpu_offload=CPUOffload(offload_params=True),
+        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP, # Sfrutta ZeRO-2 per gradienti e ottimizzatore
+        cpu_offload=None, # <--- IMPOSTA A NONE (Rimuove il blocco di controllo CPU/CUDA)
         mixed_precision=fsdp_mixed_precision,
         sync_module_states=True
     )
