@@ -24,9 +24,12 @@ from libero.libero.envs.env_wrapper import ControlEnv
 from libero.libero.utils import get_libero_path
 
 if __name__ == "__main__":
-        
-    datasets_dir = "../LIBERO/libero/datasets"
-    resample_data_dir = '../resampled_data'
+
+    with open('../config/config_path.json', 'r') as f:
+        paths = json.load(f)
+    
+    datasets_dir = paths['datasets_dir']
+    resample_data_dir = paths['resample_data_dir']
     
     with open('../config/config_training_policy.json', 'r') as f:
         config = json.load(f)

@@ -4,18 +4,17 @@
 # Data: 2026
 
 import os
+import json
 from huggingface_hub import snapshot_download, hf_hub_download
 
 # --- DOWNLOAD MODELS FUNCTION ---- #
-def hf_download_models(hf_model_list):
+def hf_download_models(hf_model_list, target_dir):
 # Description: Function to download the weights of different models 
 # and save them to the local directory "checkpoints".
 # Args:
 #   hf_model_list: A list of Hugging Face repository identifiers to download the models from, for example ["facebook/vjepa2-vith-fpc64-256", "google-bert/bert-base-uncased"]
 # Returns:
 #   target_dir: The local directory where the downloaded models are saved, in this case "checkpoints"
-
-    target_dir = "../checkpoints" # the directory where the downloaded models will be saved 
 
     # Create the target directory if it does not exist, otherwise print that the directory already exists
     os.makedirs(target_dir, exist_ok=True)
@@ -53,6 +52,12 @@ def hf_download_models(hf_model_list):
 
 
 if __name__ == "__main__":
+
+    with open('../config/config_path.json', 'r') as f:
+        paths = json.load(f)
+    
+    target_dir = paths['target_dir']
+
     # Call the function to download the V-JEPA 2 weights and save them to the local directory "checkpoints"
     weights_path = hf_download_models(
                     hf_model_list=[
@@ -60,7 +65,8 @@ if __name__ == "__main__":
                         "openai/clip-vit-large-patch14",
                         "facebook/jepa-wms/vjepa2_ac_droid.pth.tar"
                       
-                    ]
+                    ],
+                    target_dir = target_dir
                     )
     print(f"\nPretrained model weights downloaded and saved at: {weights_path}\n")
 
