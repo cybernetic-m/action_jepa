@@ -166,7 +166,7 @@ if __name__ == '__main__':
         auto_wrap_policy=auto_wrap_policy,
         sharding_strategy=ShardingStrategy.SHARD_GRAD_OP, # Sfrutta ZeRO-2 per gradienti e ottimizzatore
         cpu_offload=None, # <--- IMPOSTA A NONE (Rimuove il blocco di controllo CPU/CUDA)
-        mixed_precision=fsdp_mixed_precision,
+        mixed_precision=None,
         sync_module_states=True
     )
 
