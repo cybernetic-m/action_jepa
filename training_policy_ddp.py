@@ -5,10 +5,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import torch.distributed as dist
-# --- MODIFICATO: Aggiunto l'import di CPUOffload per proteggere la VRAM ---
+# --- MODIFICATO: Aggiunto l'import di ShardingStrategy ---
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from torch.distributed.fsdp import CPUOffload
+from torch.distributed.fsdp import ShardingStrategy
 # ----------------------------------------------------------------------
 from torch.utils.data.distributed import DistributedSampler
 from Dataset.PolicyDataset2 import PolicyDataset
@@ -121,7 +122,6 @@ if __name__ == '__main__':
         predictor_path = os.path.join(checkpoints_path, "facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
     clip_path = os.path.join(checkpoints_path, "openai/clip-vit-large-patch14")
 
-    # --- MODIFICATO: Istanziamo il modello lasciandolo su CPU (Rimosso .to(device)) ---
     model = TransformerActionJEPA(
         vjepa_encoder_path=vjepa_path,
         vjepa_predictor_path=predictor_path,
@@ -138,16 +138,16 @@ if __name__ == '__main__':
         finetuned_pred=FINETUNED_PRED,
         device=device,
     )
-    # ---------------------------------------------------------------------------------
 
-    # --- MODIFICATO: Avvolgimento FSDP con CPU Offload attivato per evitare picchi OOM ---
+    # --- MODIFICATO: Configurato FSDP con SHARD_GRAD_OP (ZeRO-2) per stabilizzare la VRAM ---
     auto_wrap_policy = size_based_auto_wrap_policy
     
     model = FSDP(
         model, 
         device_id=torch.cuda.current_device(),
         auto_wrap_policy=auto_wrap_policy,
-        cpu_offload=CPUOffload(offload_params=True) # Esegue il flatten dei pesi sulla RAM di sistema
+        sharding_strategy=ShardingStrategy.SHARD_GRAD_OP, # Evita il picco di allocazione iniziale dello shard
+        cpu_offload=CPUOffload(offload_params=True)
     )
     # -------------------------------------------------------------------------------------
 
@@ -159,8 +159,6 @@ if __name__ == '__main__':
         os.makedirs(results_dir_path, exist_ok=True)
 
     loss_fn = nn.MSELoss()
-    
-    # L'ottimizzatore viene agganciato adesso che i parametri sono stati shardati correttamente
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
     if MIXED_PRECISION:
