@@ -42,6 +42,10 @@ class PolicyDataset(Dataset):
             #self.all_actions.append(data['actions'].float())
 
             steps = data['frames'].shape[0] 
+            frames_len = data['frames'].shape[0]
+            actions_len = data['actions'].shape[0]
+            print(f"    --> Lunghezza FRAMES:  {frames_len}")
+            print(f"    --> Lunghezza ACTIONS: {actions_len}")
             
             for start_idx in range(0, steps):
                 self.window_indices.append((data_idx,start_idx))
