@@ -64,8 +64,8 @@ if __name__ == "__main__":
     axes[6].grid(True, alpha=0.3)
     axes[6].ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 
-    axes[7].plot(df['Epoch'], df['loss_actor_val'], color="#fe9d0c", label='Loss Actor', linewidth=2)
-    axes[7].plot(df['Epoch'], df['loss_refiner_val'], color="#d81a33", label='Loss Refiner', linewidth=2)
+    axes[7].plot(df['Epoch'], df['actor_mae_xyz_val'], color="#fe9d0c", label='Loss Actor', linewidth=2)
+    axes[7].plot(df['Epoch'], df['actor_mae_xyz_val'], color="#d81a33", label='Loss Refiner', linewidth=2)
     axes[7].set_title('Validation Losses', fontweight='bold')
     axes[7].set_ylabel('Validation Losses')
     axes[7].grid(True, alpha=0.3)
