@@ -17,7 +17,7 @@ class CLIPEncoder(nn.Module):
         if os.path.exists(model_path): 
             # Setting CLIP tokenizer and encoder
             self.tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path=model_path)
-            self.clip_model = CLIPModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
+            self.clip_model = CLIPModel.from_pretrained(pretrained_model_name_or_path=model_path)
             self.language_encoder = self.clip_model.text_model
         else:
             raise FileNotFoundError(f"CLIP model not found in {model_path}. Run 'python download_models.py' to download it!")

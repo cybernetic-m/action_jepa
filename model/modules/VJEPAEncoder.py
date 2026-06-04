@@ -15,7 +15,7 @@ class VJEPAEncoder(nn.Module):
         
         # load the model weights from the local path, setting local_files_only to True to avoid trying to download the weights from Hugging Face if they are not found at the local path
         if os.path.exists(model_path):
-            self.model = AutoModel.from_pretrained(model_path, local_files_only=True).to(device) # load the entire V-JEPA Model
+            self.model = AutoModel.from_pretrained(model_path, local_files_only=True) # load the entire V-JEPA Model
             self.vision_encoder = self.model.encoder # Take only the V-JEPA Encoder part
             self.vision_processor = AutoVideoProcessor.from_pretrained(model_path, local_files_only=True) # Load the processor
         else:
