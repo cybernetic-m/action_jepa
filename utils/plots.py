@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    training_dir_path = "./results/policy/results_7"
+    training_dir_path = "./results/results_alcor_1/2026_05_31__22_42"
     metrics_path = os.path.join(training_dir_path, 'metrics.csv')
 
     df = pd.read_csv(metrics_path)
@@ -64,7 +64,13 @@ if __name__ == "__main__":
     axes[6].grid(True, alpha=0.3)
     axes[6].ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 
-    fig.delaxes(axes[7])
+    axes[7].plot(df['Epoch'], df['loss_actor_val'], color="#fe9d0c", label='Loss Actor', linewidth=2)
+    axes[7].plot(df['Epoch'], df['loss_refiner_val'], color="#d81a33", label='Loss Refiner', linewidth=2)
+    axes[7].set_title('Validation Losses', fontweight='bold')
+    axes[7].set_ylabel('Validation Losses')
+    axes[7].grid(True, alpha=0.3)
+    axes[7].ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+
 
     plt.tight_layout()
     plt.savefig(os.path.join(training_dir_path,'plots.png'), dpi=300)
