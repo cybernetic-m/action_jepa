@@ -1,18 +1,14 @@
 import os
 import random
 import json
-from Dataset.PolicyDataset import PolicyDataset
-from model.MLPActionJEPA import MLPActionJEPA
+from Dataset.PolicyDataset2 import PolicyDataset
 from model.TransformerActionJEPA import TransformerActionJEPA
 from training.train import train_policy
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 import numpy as np
-import cv2
 from torch.amp import GradScaler
-import pandas as pd
-import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
 
@@ -68,6 +64,7 @@ if __name__ == '__main__':
 
     print("="*40)
     print(f"✅ Training config created!")
+    print(F"Num Frames: {NUM_FRAMES}")
     print(f"Epochs: {NUM_EPOCHS} | Batch Size: {BATCH_SIZE}")
     print(f"LR: {LEARNING_RATE} ")
     print(f"Dataset: {DATASETS}")
@@ -80,6 +77,7 @@ if __name__ == '__main__':
 
     dataset = PolicyDataset(datasets=DATASETS,
                         task_ids = TASK_IDS,
+                        num_frames=NUM_FRAMES,
                         full_load_ram=True
                         )
     print("Finish Loading Dataset...")
@@ -104,29 +102,22 @@ if __name__ == '__main__':
         predictor_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
     clip_path = os.path.join(checkpoints_path,"openai/clip-vit-large-patch14")
 
-    if POLICY == "mlp":
-        model = MLPActionJEPA(
-            vjepa_encoder_path=vjepa_path,
-            vjepa_predictor_path=predictor_path,
-            clip_model_path=clip_path,
-            device=device
-        ).to(device)
-    else:
-        model = TransformerActionJEPA(
-            vjepa_encoder_path=vjepa_path,
-            vjepa_predictor_path=predictor_path,
-            clip_model_path=clip_path,
-            embed_dim = EMBED_DIM,
-            transformer_layers = TRANSFORMER_LAYERS,
-            transformer_heads = TRANSFORMER_HEADS,
-            transformer_ff_dim = TRANSFORMER_FF_DIM,
-            transformer_dropout = TRANSFORMER_DROPOUT,
-            mlp_hidden_dims = MLP_HIDDEN_DIMS,
-            mlp_dropout = MLP_DROPOUT,
-            frozen_backbone = FROZEN_BACKBONE,
-            finetuned_pred = FINETUNED_PRED,
-            device=device,
-        ).to(device)
+    model = TransformerActionJEPA(
+        vjepa_encoder_path=vjepa_path,
+        vjepa_predictor_path=predictor_path,
+        clip_model_path=clip_path,
+        num_frames=NUM_FRAMES,
+        embed_dim = EMBED_DIM,
+        transformer_layers = TRANSFORMER_LAYERS,
+        transformer_heads = TRANSFORMER_HEADS,
+        transformer_ff_dim = TRANSFORMER_FF_DIM,
+        transformer_dropout = TRANSFORMER_DROPOUT,
+        mlp_hidden_dims = MLP_HIDDEN_DIMS,
+        mlp_dropout = MLP_DROPOUT,
+        frozen_backbone = FROZEN_BACKBONE,
+        finetuned_pred = FINETUNED_PRED,
+        device=device,
+    ).to(device)
 
     model.print_model_info()
 

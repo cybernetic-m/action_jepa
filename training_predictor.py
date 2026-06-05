@@ -4,7 +4,7 @@ import json
 from Dataset.PredictorDataset import PredictorDataset
 from model.modules.PredictorAC import PredictorAC
 from model.modules.VJEPAEncoder import VJEPAEncoder
-from training.train import train_predictor
+from old.train import train_predictor
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split

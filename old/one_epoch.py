@@ -39,6 +39,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                 # Making the predictions
                 actor_action_seq_pred, refiner_action_seq_pred = model(text_input, vision_input, joint_input)
 
+                actor_action_seq_pred = actor_action_seq_pred.squeeze(1)
+                refiner_action_seq_pred = refiner_action_seq_pred.squeeze(1)
+
                 # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
                 loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
                 loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
@@ -47,19 +50,15 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             with torch.no_grad():
         
                 # MAE XYZ
-                actor_mae_xyz = torch.abs(actor_action_seq_pred[:, :, :3] - action_seq_target[:, :, :3]).mean()
-                refiner_mae_xyz = torch.abs(refiner_action_seq_pred[:, :, :3] - action_seq_target[:, :, :3]).mean()
+                mae_xyz = torch.abs(refiner_action_seq_pred[:, :3] - action_seq_target[:, :3]).mean()
                 
                 # MAE Gripper
-                actor_mae_grip = torch.abs(actor_action_seq_pred[:, :, -1] - action_seq_target[:, :, -1]).mean()
-                refiner_mae_grip = torch.abs(refiner_action_seq_pred[:, :, -1] - action_seq_target[:, :, -1]).mean()
+                mae_grip = torch.abs(refiner_action_seq_pred[:, -1] - action_seq_target[:, -1]).mean()
                 
                 # Cosine similarity
-                actor_pred_ori = actor_action_seq_pred[:, :, 3:6].reshape(-1, 3)
-                refiner_pred_ori = refiner_action_seq_pred[:, :, 3:6].reshape(-1, 3)
-                target_ori = action_seq_target[:, :, 3:6].reshape(-1, 3)
-                refiner_cosim_ori = F.cosine_similarity(refiner_pred_ori, target_ori, dim=-1).mean()
-                actor_cosim_ori = F.cosine_similarity(refiner_pred_ori, target_ori, dim=-1).mean()
+                pred_ori = refiner_action_seq_pred[:, 3:6].reshape(-1, 3)
+                target_ori = action_seq_target[:, 3:6].reshape(-1, 3)
+                cosim_ori = F.cosine_similarity(pred_ori, target_ori, dim=-1).mean()
                         
             if not validation:
                 
@@ -88,12 +87,9 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             epoch_loss += loss.item()
             epoch_loss_actor += loss_actor.item()
             epoch_loss_refiner += loss_refiner.item()
-            refiner_epoch_mae_xyz += refiner_mae_xyz.item()
-            refiner_epoch_mae_gripper += refiner_mae_grip.item()
-            refiner_epoch_cosim_ori += refiner_cosim_ori.item()
-            actor_epoch_mae_xyz += actor_mae_xyz.item()
-            actor_epoch_mae_gripper += actor_mae_grip.item()
-            actor_epoch_cosim_ori += actor_cosim_ori.item()
+            epoch_mae_xyz += mae_xyz.item()
+            epoch_mae_gripper += mae_grip.item()
+            epoch_cosim_ori += cosim_ori.item()
 
             # Updating values in the bar
             pbar.set_postfix({
@@ -105,23 +101,17 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
         loss_epoch_avg = epoch_loss / len(dataloader)
         loss_epoch_actor_avg = epoch_loss_actor / len(dataloader)
         loss_epoch_refiner_avg = epoch_loss_refiner / len(dataloader)
-        refiner_epoch_mae_xyz = refiner_epoch_mae_xyz / len(dataloader)
-        refiner_epoch_mae_gripper = refiner_epoch_mae_gripper / len(dataloader)
-        refiner_epoch_cosim_ori = refiner_epoch_cosim_ori / len(dataloader)
-        actor_epoch_mae_xyz = actor_epoch_mae_xyz / len(dataloader)
-        actor_epoch_mae_gripper = actor_epoch_mae_gripper / len(dataloader)
-        actor_epoch_cosim_ori = actor_epoch_cosim_ori / len(dataloader)
+        epoch_mae_xyz = epoch_mae_xyz / len(dataloader)
+        epoch_mae_gripper = epoch_mae_gripper / len(dataloader)
+        epoch_cosim_ori = epoch_cosim_ori / len(dataloader)
 
         metrics = {
             'loss': loss_epoch_avg,
             'loss_actor': loss_epoch_actor_avg,
             'loss_refiner': loss_epoch_refiner_avg,
-            'refiner_mae_xyz': refiner_epoch_mae_xyz,
-            'refiner_mae_gripper': refiner_epoch_mae_gripper,
-            'refiner_cosim_ori': refiner_epoch_cosim_ori,
-            'actor_mae_xyz': actor_epoch_mae_xyz,
-            'actor_mae_gripper': actor_epoch_mae_gripper,
-            'actor_cosim_ori': actor_epoch_cosim_ori
+            'mae_xyz': epoch_mae_xyz,
+            'mae_gripper': epoch_mae_gripper,
+            'cosim_ori': epoch_cosim_ori
 
         }
     

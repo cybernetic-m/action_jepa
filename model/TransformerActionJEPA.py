@@ -44,6 +44,7 @@ class TransformerActionJEPA(nn.Module):
         self.transformer_dropout = transformer_dropout
         self.mlp_hidden_dims = mlp_hidden_dims
         self.mlp_dropout = mlp_dropout
+        self.T = self.num_frames // 2
 
     
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
@@ -55,7 +56,7 @@ class TransformerActionJEPA(nn.Module):
         self.language_proj = nn.Linear(language_dim, embed_dim)
         self.vision_proj = nn.Linear(vision_dim, embed_dim)
 
-        self.action_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.action_token = nn.Parameter(torch.randn(1, self.T, embed_dim))
         
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
@@ -144,18 +145,20 @@ class TransformerActionJEPA(nn.Module):
         # ACTOR 
         actor_context = torch.cat([z_obs_attention, z_text_proj, z_joint_proj], dim=1)
         latent_actor_action = self.actor(action_token, actor_context)
-        actor_action = self.actor_head(latent_actor_action.squeeze(1))
+        actor_action = self.actor_head(latent_actor_action.view(B*self.T, -1))
+        actor_action = actor_action.view(B, self.T, self.action_dim)
        
         # PREDICTOR
         with torch.no_grad():
-            z_pred, _, _ = self.predictor(z_obs, actor_action.unsqueeze(1))
+            z_pred, _, _ = self.predictor(z_obs, actor_action)
         z_pred_proj = self.vision_proj(z_pred)
         z_pred_attention = torch.sum(z_pred_proj * attn_weights, dim=1, keepdim=True)
         
         # REFINER
         refiner_context = torch.cat([z_obs_attention, z_pred_attention, z_text_proj, z_joint_proj], dim=1)
         latent_refiner_action = self.refiner(action_token, refiner_context)
-        refiner_action = self.refiner_head(latent_refiner_action.squeeze(1))
+        refiner_action = self.refiner_head(latent_refiner_action.view(B*self.T, -1))
+        refiner_action = refiner_action.view(B, self.T, self.action_dim)
 
         return actor_action, refiner_action
     

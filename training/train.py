@@ -110,10 +110,6 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
-                #'action_stats': { 
-                 #       'min': train_loader.dataset.actions_min.cpu().numpy(),
-                  #      'max': train_loader.dataset.actions_max.cpu().numpy()
-                   # },
                 'training_config': training_config,
                 'model_config': model_config
             }
