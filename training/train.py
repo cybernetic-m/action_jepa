@@ -94,12 +94,15 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
               f"Actor: {val_metrics['loss_actor']:.4f} | "
               f"Refiner: {val_metrics['loss_refiner']:.4f}")
         
-        print(f"METRICS  (Validation)  | XYZ Err: {val_metrics['mae_xyz']:.4f} | Gripper Err: {val_metrics['mae_gripper']:.4f} | "
-              f"Cosine Sim Orientation: {val_metrics['cosim_ori']:.4f}")
+        print(f"METRICS ACTOR  (Validation)  | XYZ Err: {val_metrics['actor_mae_xyz']:.4f} | Gripper Err: {val_metrics['actor_mae_gripper']:.4f} | "
+              f"Cosine Sim Orientation: {val_metrics['actor_cosim_ori']:.4f}")
+        
+        print(f"METRICS REFINER (Validation)  | XYZ Err: {val_metrics['refiner_mae_xyz']:.4f} | Gripper Err: {val_metrics['refiner_mae_gripper']:.4f} | "
+              f"Cosine Sim Orientation: {val_metrics['refiner_cosim_ori']:.4f}")
         
         print("-" * 80) 
 
-        current_mae_xyz = val_metrics['mae_xyz']
+        current_mae_xyz = val_metrics['refiner_mae_xyz']
 
         if current_mae_xyz < best_mae_xyz:
             best_mae_xyz = current_mae_xyz
