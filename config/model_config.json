@@ -11,7 +11,7 @@
     "frozen_backbone": true,
     "finetuned_pred": false,
     "transformer_layers": 16,
-    "transformer_heads": 12,
+    "transformer_heads": 16,
     "transformer_ff_dim": 4096,
     "transformer_dropout": 0.1,
     "mlp_hidden_dims": [512, 256, 128],

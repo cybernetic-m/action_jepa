@@ -66,6 +66,7 @@ if __name__ == '__main__':
     print("="*40)
     print(f"✅ Training config created!")
     print(f"Num Frames: {NUM_FRAMES}")
+    print(f"Action Chunk Size: {ACTION_CHUNK_SIZE}")
     print(f"Epochs: {NUM_EPOCHS} | Batch Size: {BATCH_SIZE}")
     print(f"LR: {LEARNING_RATE} ")
     print(f"Dataset: {DATASETS}")
