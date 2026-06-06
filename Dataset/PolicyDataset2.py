@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 class PolicyDataset(Dataset):
-    def __init__(self, datasets, task_ids, num_frames, full_load_ram = False):
+    def __init__(self, datasets, task_ids, num_frames, action_chunk_size, full_load_ram = False):
 
         super(PolicyDataset, self).__init__()
 
@@ -15,8 +15,7 @@ class PolicyDataset(Dataset):
         self.task_ids = task_ids
         self.full_load_ram = full_load_ram
         self.num_frames = num_frames
-        self.T = self.num_frames // 2
-        discrepancies_count = 0
+        self.action_chunk_size = action_chunk_size
         
         for dataset in self.datasets:
             for task_id in self.task_ids:
@@ -40,23 +39,7 @@ class PolicyDataset(Dataset):
             if self.full_load_ram:
                 self.loaded_demos.append(data)
 
-            #self.all_actions.append(data['actions'].float())
-
-            frames_len = data['frames'].shape[0]
-            actions_len = data['actions'].shape[0]
-
-            '''
-            if frames_len != actions_len:
-                discrepancies_count += 1
-                # Stampiamo solo i primi 5 per evitare di intasare il terminale, ma li contiamo tutti
-                if discrepancies_count <= 5:
-                    print(f"\n[!] Discrepanza rilevata nel file: {path}")
-                    print(f"    --> Lunghezza FRAMES:  {frames_len}")
-                    print(f"    --> Lunghezza ACTIONS: {actions_len}")
-                    print(f"    --> Differenza:        {actions_len - frames_len} elementi")
-            '''
-
-            steps = frames_len
+            steps = data['frames'].shape[0]
             
             for start_idx in range(0, steps):
                 self.window_indices.append((data_idx,start_idx))
@@ -80,9 +63,7 @@ class PolicyDataset(Dataset):
         frames = demo['frames']        
         actions = demo['actions'].float()      
         joint_states = demo['joint_states'].float()
-        
-        total_steps = frames.shape[0]
-
+    
         start_frame_idx = current_idx - self.num_frames + 1
         
         if start_frame_idx >= 0:
@@ -99,21 +80,21 @@ class PolicyDataset(Dataset):
         
         vision_input = torch.from_numpy(vision_input).byte().clone()
 
-        available_actions = actions[current_idx : current_idx + self.T]
+        available_actions = actions[current_idx : current_idx + self.action_chunk_size]
         num_extracted = available_actions.shape[0]
 
-        if num_extracted == self.T:
+        if num_extracted == self.action_chunk_size:
             action_output = available_actions
         elif num_extracted > 0:
-            pad_size = self.T - num_extracted
+            pad_size = self.action_chunk_size - num_extracted
             last_valid_action = available_actions[-1:] 
             pad_actions = last_valid_action.repeat(pad_size, 1)
             action_output = torch.cat([available_actions, pad_actions], dim=0)
         else:
             last_absolute_action = actions[-1:] 
-            action_output = last_absolute_action.repeat(self.T, 1)
+            action_output = last_absolute_action.repeat(self.action_chunk_size, 1)
         
-        action_output = action_output[:self.T]
+        action_output = action_output[:self.action_chunk_size]
 
         joint_input = joint_states[current_idx]
         

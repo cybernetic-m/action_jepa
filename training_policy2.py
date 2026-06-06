@@ -1,8 +1,8 @@
 import os
 import random
 import json
-from Dataset.PolicyDataset import PolicyDataset
-from model.TransformerActionJEPA import TransformerActionJEPA
+from Dataset.PolicyDataset2 import PolicyDataset
+from model.TransformerActionJEPA2 import TransformerActionJEPA
 from training.train import train_policy
 import torch
 import torch.nn as nn
@@ -53,6 +53,7 @@ if __name__ == '__main__':
     MAX_LENGTH = model_config['max_length'] # it is the resulting tokens length after CLIP text encoder
     POLICY = model_config['policy'] # it can be "mlp" or "transformer"
     NUM_FRAMES = model_config['num_frames']
+    ACTION_CHUNK_SIZE = model_config['action_chunk_size']
     EMBED_DIM = model_config['embed_dim']
     FROZEN_BACKBONE = model_config['frozen_backbone']
     TRANSFORMER_LAYERS = model_config['transformer_layers']
@@ -78,6 +79,7 @@ if __name__ == '__main__':
     dataset = PolicyDataset(datasets=DATASETS,
                         task_ids = TASK_IDS,
                         num_frames=NUM_FRAMES,
+                        action_chunk_size=ACTION_CHUNK_SIZE,
                         full_load_ram=True
                         )
     print("Finish Loading Dataset...")
@@ -107,6 +109,7 @@ if __name__ == '__main__':
         vjepa_predictor_path=predictor_path,
         clip_model_path=clip_path,
         num_frames=NUM_FRAMES,
+        action_chunk_size=ACTION_CHUNK_SIZE,   
         embed_dim = EMBED_DIM,
         transformer_layers = TRANSFORMER_LAYERS,
         transformer_heads = TRANSFORMER_HEADS,
