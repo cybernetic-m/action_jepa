@@ -160,7 +160,7 @@ class TransformerActionJEPA(nn.Module):
         refiner_action = self.refiner_head(latent_refiner_action.view(B*self.T, -1))
         refiner_action = refiner_action.view(B, self.T, self.action_dim)
 
-        return actor_action, refiner_action, attn_weights
+        return actor_action, refiner_action
     
     def print_model_info(self):
         print("MODEL INFO:\n")
