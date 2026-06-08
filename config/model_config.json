@@ -1,7 +1,7 @@
 {
     "policy": "transformer",
     "num_frames": 2,
-    "action_chunk_size": 4,
+    "action_chunk_size": 6,
     "max_length": 77,
     "vision_dim": 1408,
     "language_dim": 768,
