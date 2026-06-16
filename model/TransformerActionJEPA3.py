@@ -149,10 +149,11 @@ class TransformerActionJEPA(nn.Module):
         actor_action = self.actor_head(latent_actor_action.view(B*self.action_chunk_size, -1))
         actor_action = actor_action.view(B, self.action_chunk_size, self.action_dim)
 
-        first_actor_action_prediction = actor_action[:, 0, :].unsqueeze(1)
+        target_frames = self.num_frames // 2
+        actor_action_for_predictor = actor_action[:, :target_frames, :]
        
         # PREDICTOR
-        z_pred, _, _ = self.predictor(z_obs, first_actor_action_prediction)
+        z_pred, _, _ = self.predictor(z_obs, actor_action_for_predictor)
         z_pred_proj = self.vision_proj(z_pred)
         z_pred_context = torch.mean(z_pred_proj, dim=1, keepdim=True)
         
