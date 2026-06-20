@@ -2,7 +2,7 @@
     "num_epochs": 100,
     "batch_size": 32,
     "learning_rate": 1e-4,
-    "datasets": ["libero_spatial"],
+    "datasets": ["libero_goal"],
     "task_ids": [0,1,2,3,4,5,6,7,8,9],
     "datasets_resampling": ["libero_goal", "libero_spatial", "libero_object", "libero_10"],
     "mixed_precision": true,

@@ -2,7 +2,7 @@ import os
 import random
 import json
 from Dataset.PolicyDataset3 import PolicyDataset
-from model.TransformerActionJEPA3 import TransformerActionJEPA
+from model.TransformerActionJEPA4 import TransformerActionJEPA
 from training.train3 import train_policy
 import torch
 import torch.nn as nn
@@ -71,7 +71,6 @@ if __name__ == '__main__':
     print(f"LR: {LEARNING_RATE} ")
     print(f"Dataset: {DATASETS}")
     print(f"Tasks: {TASK_IDS}")
-    print(f"Fine Tuned predictor: {FINETUNED_PRED}")
     print(f"Max Length: {MAX_LENGTH}")
     print(f"Policy type: {POLICY}")
     print(f"Mixed Precision: {MIXED_PRECISION}")
@@ -97,6 +96,7 @@ if __name__ == '__main__':
     print(f"Total dataset size (windows): {len(dataset)}, Train Size (windows): {len(train_dataset)}, Validation Size (windows): {len(val_dataset)}, Test Size (windows): {len(test_dataset)}")
 
     checkpoints_path = "./checkpoints"
+    
     # Path for all the models
     vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
     predictor_path = os.path.join(checkpoints_path,"facebook/jepa-wms/vjepa2_ac_droid.pth.tar/vjepa2_ac_droid.pth.tar")
