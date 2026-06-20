@@ -162,7 +162,7 @@ class TransformerActionJEPA(nn.Module):
 
         # PREDICTOR
         actor_action_for_predictor = actor_action[:, 0:1, :]
-        z_pred, _, _ = self.predictor(z_obs[:,-256,:], actor_action_for_predictor)
+        z_pred, _, _ = self.predictor(z_obs[:,-256:,:], actor_action_for_predictor)
         z_pred_proj = self.vision_proj(z_pred)
         
         if self.aggregation_mode == "CMA":
