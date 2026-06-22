@@ -58,10 +58,7 @@ class TransformerActionJEPA(nn.Module):
         self.vision_proj = nn.Linear(vision_dim, embed_dim)
 
         self.action_token = nn.Parameter(torch.randn(1, self.action_chunk_size, embed_dim))
-        self.vision_mod_emb = nn.Parameter(torch.randn(1, 1, embed_dim))
-        self.language_mod_emb = nn.Parameter(torch.randn(1, 1, embed_dim))
-        self.joint_mod_emb = nn.Parameter(torch.randn(1, 1, embed_dim))
-        self.pred_mod_emb = nn.Parameter(torch.randn(1, 1, embed_dim))
+        
         
         self.actor = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
@@ -152,9 +149,6 @@ class TransformerActionJEPA(nn.Module):
             z_obs_context = torch.mean(z_obs_proj, dim=1, keepdim=True)
 
         # ACTOR 
-        z_obs_context = z_obs_context + self.vision_mod_emb
-        z_text_proj = z_text_proj + self.language_mod_emb
-        z_joint_proj = z_joint_proj + self.joint_mod_emb
         actor_context = torch.cat([z_obs_context, z_text_proj, z_joint_proj], dim=1)
         latent_actor_action = self.actor(action_token, actor_context)
         actor_action = self.actor_head(latent_actor_action.view(B*self.action_chunk_size, -1))
@@ -175,7 +169,6 @@ class TransformerActionJEPA(nn.Module):
             z_pred_context = torch.mean(z_pred_proj, dim=1, keepdim=True)
         
         # REFINER
-        z_pred_context = z_pred_context + self.pred_mod_emb
         refiner_context = torch.cat([actor_context, z_pred_context], dim=1)
         latent_refiner_action = self.refiner(action_token, refiner_context)
         refiner_action = self.refiner_head(latent_refiner_action.view(B*self.action_chunk_size, -1))
