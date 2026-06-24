@@ -19,6 +19,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
     epoch_loss = 0 
     epoch_loss_actor = 0
     epoch_loss_refiner = 0
+    epoch_loss_predictor = 0
     refiner_epoch_mae_xyz = 0   # it's the mean absolute error for the position xyz of the gripper
     refiner_epoch_mae_gripper = 0 # it's the mean absolute error for the gripper [0;2] (gripper are in range -1,1)
     refiner_epoch_cosim_ori = 0 # it's the cosine similarity between the orientation vectors target and predicted
@@ -96,6 +97,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             epoch_loss += loss.item()
             epoch_loss_actor += loss_actor.item()
             epoch_loss_refiner += loss_refiner.item()
+            epoch_loss_predictor += loss_predictor.item()
             refiner_epoch_mae_xyz += refiner_mae_xyz.item()
             refiner_epoch_mae_gripper += refiner_mae_grip.item()
             refiner_epoch_cosim_ori += refiner_cosim_ori.item()
@@ -108,11 +110,13 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                 'loss': f"{loss.item():.4f}",
                 'actor loss': f"{loss_actor.item():.4f}",
                 'refiner loss': f"{loss_refiner.item():.4f}",
+                'pred loss': f"{loss_predictor.item():.4f}"
             })
         
         loss_epoch_avg = epoch_loss / len(dataloader)
         loss_epoch_actor_avg = epoch_loss_actor / len(dataloader)
         loss_epoch_refiner_avg = epoch_loss_refiner / len(dataloader)
+        loss_epoch_predictor_avg = epoch_loss_predictor / len(dataloader)
         refiner_epoch_mae_xyz = refiner_epoch_mae_xyz / len(dataloader)
         refiner_epoch_mae_gripper = refiner_epoch_mae_gripper / len(dataloader)
         refiner_epoch_cosim_ori = refiner_epoch_cosim_ori / len(dataloader)
@@ -124,6 +128,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             'loss': loss_epoch_avg,
             'loss_actor': loss_epoch_actor_avg,
             'loss_refiner': loss_epoch_refiner_avg,
+            'loss_predictor': loss_epoch_predictor_avg,
             'refiner_mae_xyz': refiner_epoch_mae_xyz,
             'refiner_mae_gripper': refiner_epoch_mae_gripper,
             'refiner_cosim_ori': refiner_epoch_cosim_ori,
