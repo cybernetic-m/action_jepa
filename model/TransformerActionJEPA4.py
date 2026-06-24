@@ -147,6 +147,9 @@ class TransformerActionJEPA(nn.Module):
         elif self.aggregation_mode == "GAP":
             # GLOBAL AVERAGE POOLING
             z_obs_context = torch.mean(z_obs_proj, dim=1, keepdim=True)
+        elif self.aggregation_mode == "MAX":
+            # GLOBAL MAX POOLING
+            z_obs_context = torch.max(z_obs_proj, dim=1, keepdim=True)[0]
 
         # ACTOR 
         actor_context = torch.cat([z_obs_context, z_text_proj, z_joint_proj], dim=1)
@@ -167,6 +170,9 @@ class TransformerActionJEPA(nn.Module):
         elif self.aggregation_mode == "GAP":
             # GLOBAL AVERAGE POOLING
             z_pred_context = torch.mean(z_pred_proj, dim=1, keepdim=True)
+        elif self.aggregation_mode == "MAX":
+            # GLOBAL MAX POOLING
+            z_pred_context = torch.max(z_pred_proj, dim=1, keepdim=True)[0]
         
         # REFINER
         refiner_context = torch.cat([actor_context, z_pred_context], dim=1)
