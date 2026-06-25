@@ -1,10 +1,6 @@
 {
     "checkpoints_path" : "./checkpoints",
-    "finetuned_predictor_path": "results/predictor/2026_05_15__14_49/best_model.pth",
     "results_dir_path" : "./results/policy",
-    "datasets_dir" : "../LIBERO/libero/datasets",
-    "resample_data_dir" : "../resampled_data",
-    "target_dir" : "../checkpoints"  
-    
-
+    "datasets_dir" : "LIBERO/libero/datasets",
+    "resample_data_dir" : "resampled_data"
 }

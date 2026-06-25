@@ -25,19 +25,23 @@ from libero.libero.utils import get_libero_path
 
 if __name__ == "__main__":
 
-    with open('../config/config_path.json', 'r') as f:
+    with open('./config/config_path.json', 'r') as f:
         paths = json.load(f)
     
-    datasets_dir = paths['datasets_dir']
-    resample_data_dir = paths['resample_data_dir']
+    datasets_dir = os.path.abspath(os.path.join(root_path, paths['datasets_dir']))
+    resample_data_dir = os.path.abspath(os.path.join(root_path, paths['resample_data_dir']))
+    print(datasets_dir)
+    print(resample_data_dir)
     
-    with open('../config/config_training_policy.json', 'r') as f:
+    with open('./config/config_training_policy.json', 'r') as f:
         config = json.load(f)
 
     DATASETS = config['datasets_resampling']
 
     # PART OF RESAMPLING DATA 
-    for dataset_name in DATASETS:
+    for dataset_name in ["libero_90"]:
+
+        print(f"Resampling {dataset_name}")
         
         files = sorted(glob.glob(os.path.join(f"{datasets_dir}/{dataset_name}", "*.hdf5")))
         benchmark_dict = benchmark.get_benchmark_dict() 
