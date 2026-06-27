@@ -53,7 +53,7 @@ class TransformerActionJEPA(nn.Module):
         self.vision_backbone = VJEPAEncoder(model_path=vjepa_encoder_path, frozen=frozen_backbone, device=device)
         self.language_backbone = CLIPEncoder(model_path=clip_model_path, frozen=frozen_backbone, device=device)
         
-        self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, frozen=False, device=device)
+        self.predictor = PredictorAC(model_path=vjepa_predictor_path, num_frames=self.num_frames, frozen=True, device=device)
   
         self.joint_proj = nn.Linear(joint_dim, embed_dim)
         self.language_proj = nn.Linear(language_dim, embed_dim)
@@ -160,9 +160,10 @@ class TransformerActionJEPA(nn.Module):
         actor_action = actor_action.view(B, self.action_chunk_size, self.action_dim)
 
         # PREDICTOR
-        actor_action_for_predictor = actor_action[:, 0:1, :]
-        z_pred, _, _ = self.predictor(z_obs[:,-256:,:], actor_action_for_predictor)
-        z_pred_proj = self.vision_proj(z_pred)
+        with torch.no_grad():
+            actor_action_for_predictor = actor_action[:, 0:1, :]
+            z_pred, _, _ = self.predictor(z_obs[:,-256:,:], actor_action_for_predictor)
+            z_pred_proj = self.vision_proj(z_pred)
         
         if self.aggregation_mode_refiner == "CMA":
             # CROSS-MODAL ATTENTION 

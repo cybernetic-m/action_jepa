@@ -50,8 +50,8 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                 # Calculate the loss (the loss is a weighted sum of the actor loss and refiner loss)
                 loss_actor = loss_fn(actor_action_seq_pred, action_seq_target)
                 loss_refiner = loss_fn(refiner_action_seq_pred, action_seq_target)
-                loss_predictor = loss_fn(z_pred, z_target)
-                loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner) + (lambda_predictor*loss_predictor)
+                #loss_predictor = loss_fn(z_pred, z_target)
+                loss = (lambda_actor*loss_actor) + (lambda_refiner*loss_refiner) #+ (lambda_predictor*loss_predictor)
 
             with torch.no_grad():
         
@@ -97,7 +97,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             epoch_loss += loss.item()
             epoch_loss_actor += loss_actor.item()
             epoch_loss_refiner += loss_refiner.item()
-            epoch_loss_predictor += loss_predictor.item()
+            #epoch_loss_predictor += loss_predictor.item()
             refiner_epoch_mae_xyz += refiner_mae_xyz.item()
             refiner_epoch_mae_gripper += refiner_mae_grip.item()
             refiner_epoch_cosim_ori += refiner_cosim_ori.item()
@@ -110,13 +110,13 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
                 'loss': f"{loss.item():.4f}",
                 'actor loss': f"{loss_actor.item():.4f}",
                 'refiner loss': f"{loss_refiner.item():.4f}",
-                'pred loss': f"{loss_predictor.item():.4f}"
+                #'pred loss': f"{loss_predictor.item():.4f}"
             })
         
         loss_epoch_avg = epoch_loss / len(dataloader)
         loss_epoch_actor_avg = epoch_loss_actor / len(dataloader)
         loss_epoch_refiner_avg = epoch_loss_refiner / len(dataloader)
-        loss_epoch_predictor_avg = epoch_loss_predictor / len(dataloader)
+        #loss_epoch_predictor_avg = epoch_loss_predictor / len(dataloader)
         refiner_epoch_mae_xyz = refiner_epoch_mae_xyz / len(dataloader)
         refiner_epoch_mae_gripper = refiner_epoch_mae_gripper / len(dataloader)
         refiner_epoch_cosim_ori = refiner_epoch_cosim_ori / len(dataloader)
@@ -128,7 +128,7 @@ def one_epoch(model, dataloader, optimizer, loss_fn, device, scaler, lambda_acto
             'loss': loss_epoch_avg,
             'loss_actor': loss_epoch_actor_avg,
             'loss_refiner': loss_epoch_refiner_avg,
-            'loss_predictor': loss_epoch_predictor_avg,
+            #'loss_predictor': loss_epoch_predictor_avg,
             'refiner_mae_xyz': refiner_epoch_mae_xyz,
             'refiner_mae_gripper': refiner_epoch_mae_gripper,
             'refiner_cosim_ori': refiner_epoch_cosim_ori,
