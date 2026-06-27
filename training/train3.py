@@ -46,7 +46,7 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     
     for epoch in range(num_epochs):
 
-        lambda_actor, lambda_refiner = get_loss_weights(epoch=epoch, total_epoch=num_epochs)
+        #lambda_actor, lambda_refiner = get_loss_weights(epoch=epoch, total_epoch=num_epochs)
         
         print(f"\n" + "="*30)
         print(f"EPOCH: {epoch+1}/{num_epochs} - LR: {current_lr:.7f} - LAMBDA ACTOR: {lambda_actor:.7f} - LAMBDA REFINER: {lambda_refiner:.7f}")
@@ -59,12 +59,12 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
                                   loss_fn=loss_fn, 
                                   device = device,
                                   scaler=scaler,
-                                  lambda_actor=lambda_actor, 
-                                  lambda_refiner = lambda_refiner
+                                  lambda_actor=1.0, 
+                                  lambda_refiner = 1.0
                                   )
         train_metrics['lr'] = current_lr    # saving also the current value of LR
-        train_metrics['lambda_actor'] = lambda_actor
-        train_metrics['lambda_refiner'] = lambda_refiner
+        train_metrics['lambda_actor'] = 1.0
+        train_metrics['lambda_refiner'] = 1.0
 
         # One epoch of validation 
         val_metrics = one_epoch(model=model, 
@@ -73,8 +73,8 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
                                 loss_fn=loss_fn, 
                                 device = device,
                                 scaler=scaler,
-                                lambda_actor=lambda_actor, 
-                                lambda_refiner = lambda_refiner,
+                                lambda_actor=1.0, 
+                                lambda_refiner = 1.0,
                                 validation=True
                                 )
         
