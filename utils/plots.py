@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    training_dir_path = "./results/results_cnr_3/2026_06_08__17_56"
+    training_dir_path = "./results/results_cnr_7/2026_06_24__18_15"
     metrics_path = os.path.join(training_dir_path, 'metrics.csv')
 
     df = pd.read_csv(metrics_path)
