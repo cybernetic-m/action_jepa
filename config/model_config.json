@@ -1,6 +1,7 @@
 {
     "policy": "transformer",
-    "aggregation_mode": "CMA",
+    "aggregation_mode_actor": "CMA",
+    "aggregation_mode_refiner": "MAX",
     "num_frames": 2,
     "action_chunk_size": 4,
     "max_length": 77,
