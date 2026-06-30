@@ -16,7 +16,7 @@ import imageio
 import torch
 from collections import deque
 import random
-from model.TransformerActionJEPA5 import TransformerActionJEPA
+from model.TransformerActionJEPA6 import TransformerActionJEPA
 from tqdm import tqdm
 import cv2
 import json
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using the device: {device}")
 
-    policy_dir_path = './results/results_alcor_6/2026_06_24__17_41'
+    policy_dir_path = './results/results_alcor_9/2026_06_27__18_08'
 
 
     RENDER_CAMERA = "agentview" 
@@ -52,13 +52,15 @@ if __name__ == '__main__':
     MLP_HIDDEN_DIMS     = config['model']['mlp_hidden_dims']
     MLP_DROPOUT         = config['model']['mlp_dropout']
     FROZEN_BACKBONE    = config['model']['frozen_backbone']
-    AGGREGATION_MODE = config['model']['aggregation_mode']
+    AGGREGATION_MODE_ACTOR = config['model']['aggregation_mode_actor']
+    AGGREGATION_MODE_REFINER = config['model']['aggregation_mode_refiner']
 
     print(f" Camera initialized on: {RENDER_CAMERA}")
     print(f" Task suite: {DATASETS}")
     print(f"Num frames: {NUM_FRAMES}")
     print(f"Action Chunk Size: {ACTION_CHUNK_SIZE}")
-    print(f"Aggregation Mode: {AGGREGATION_MODE}")
+    print(f"Aggregation Mode Actor: {AGGREGATION_MODE_ACTOR}")
+    print(f"Aggregation Mode Refiner: {AGGREGATION_MODE_REFINER}")
 
     # Path of the models V-JEPA 2 Encoder, CLIP Encoder and V-JEPA 2 AC Predictor
     vjepa_path = os.path.join(checkpoints_path,"facebook/vjepa2-vitg-fpc64-256")
@@ -84,7 +86,8 @@ if __name__ == '__main__':
         mlp_hidden_dims = MLP_HIDDEN_DIMS,
         mlp_dropout = MLP_DROPOUT,
         frozen_backbone = FROZEN_BACKBONE,
-        #aggregation_mode = AGGREGATION_MODE,
+        aggregation_mode_actor = AGGREGATION_MODE_ACTOR,
+        aggregation_mode_refiner= AGGREGATION_MODE_REFINER,
         device=device,
     ).to(device)
 

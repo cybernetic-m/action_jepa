@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    training_dir_path = "./results/results_cnr_7/2026_06_24__18_15"
+    training_dir_path = "./results/results_alcor_8/2026_06_27__18_02"
     metrics_path = os.path.join(training_dir_path, 'metrics.csv')
 
     df = pd.read_csv(metrics_path)
@@ -21,9 +21,10 @@ if __name__ == "__main__":
     c_pred = "#4a4a4a"    # Grigio scuro (Predictor)
 
     # ==============================================================================
-    # IMMAGINE 1: LOSSES (4 plots: Total, Actor, Refiner, Val Comparison)
+    # IMMAGINE 1: LOSSES (5 plots: Total, Actor, Refiner, Predictor, Val Comparison)
     # ==============================================================================
-    fig1, axes1 = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
+    # Allarghiamo la figura a 3 colonne per fare spazio al Predictor
+    fig1, axes1 = plt.subplots(nrows=2, ncols=3, figsize=(18, 10))
     axes1 = axes1.flatten()
 
     # 1. Total Loss
@@ -53,14 +54,29 @@ if __name__ == "__main__":
     axes1[2].grid(True, alpha=0.3)
     axes1[2].legend()
 
-    # 4. Validation Loss Comparison (Actor vs Refiner)
-    axes1[3].plot(df['Epoch'], df['loss_actor_val'], label='Actor Val Loss', color=c_actor, linewidth=2.5)
-    axes1[3].plot(df['Epoch'], df['loss_refiner_val'], label='Refiner Val Loss', color=c_refiner, linewidth=2.5)
-    axes1[3].set_title('Validation Loss Comparison (Actor vs Refiner)', fontweight='bold')
-    axes1[3].set_xlabel('Epoch')
-    axes1[3].set_ylabel('Value')
-    axes1[3].grid(True, alpha=0.3)
-    axes1[3].legend()
+    # 4. Predictor Loss (Solo se presente nel CSV)
+    if 'loss_predictor_train' in df.columns and 'loss_predictor_val' in df.columns:
+        axes1[3].plot(df['Epoch'], df['loss_predictor_train'], label='Train', color=c_train)
+        axes1[3].plot(df['Epoch'], df['loss_predictor_val'], label='Val', color=c_val)
+        axes1[3].set_title('Predictor Loss', fontweight='bold')
+        axes1[3].set_xlabel('Epoch')
+        axes1[3].set_ylabel('Value')
+        axes1[3].grid(True, alpha=0.3)
+        axes1[3].legend()
+    else:
+        axes1[3].axis('off') # Nascondiamo il riquadro se le metriche non ci sono
+
+    # 5. Validation Loss Comparison (Actor vs Refiner)
+    axes1[4].plot(df['Epoch'], df['loss_actor_val'], label='Actor Val Loss', color=c_actor, linewidth=2.5)
+    axes1[4].plot(df['Epoch'], df['loss_refiner_val'], label='Refiner Val Loss', color=c_refiner, linewidth=2.5)
+    axes1[4].set_title('Validation Loss Comparison (Actor vs Refiner)', fontweight='bold')
+    axes1[4].set_xlabel('Epoch')
+    axes1[4].set_ylabel('Value')
+    axes1[4].grid(True, alpha=0.3)
+    axes1[4].legend()
+
+    # 6. Nascondiamo l'ultimo grafico vuoto (in basso a destra) per estetica
+    axes1[5].axis('off')
 
     fig1.tight_layout()
     fig1.savefig(os.path.join(training_dir_path, 'plots_losses.png'), dpi=300)

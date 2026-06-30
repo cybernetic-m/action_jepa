@@ -46,7 +46,9 @@ def train_policy(model, train_loader, val_loader, optimizer, loss_fn, num_epochs
     
     for epoch in range(num_epochs):
 
-        lambda_actor, lambda_refiner = get_loss_weights(epoch=epoch, total_epoch=num_epochs)
+        #lambda_actor, lambda_refiner = get_loss_weights(epoch=epoch, total_epoch=num_epochs)
+        lambda_actor = 1.0
+        lambda_refiner = 1.0
         
         print(f"\n" + "="*30)
         print(f"EPOCH: {epoch+1}/{num_epochs} - LR: {current_lr:.7f} - LAMBDA ACTOR: {lambda_actor:.7f} - LAMBDA REFINER: {lambda_refiner:.7f}")
