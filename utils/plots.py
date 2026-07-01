@@ -1,10 +1,11 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 if __name__ == "__main__":
 
-    training_dir_path = "./results/results_alcor_8/2026_06_27__18_02"
+    training_dir_path = "./results/results_alcor_9/2026_06_27__18_08"
     metrics_path = os.path.join(training_dir_path, 'metrics.csv')
 
     df = pd.read_csv(metrics_path)
@@ -21,62 +22,72 @@ if __name__ == "__main__":
     c_pred = "#4a4a4a"    # Grigio scuro (Predictor)
 
     # ==============================================================================
-    # IMMAGINE 1: LOSSES (5 plots: Total, Actor, Refiner, Predictor, Val Comparison)
+    # IMMAGINE 1: LOSSES (Layout asimmetrico con GridSpec)
+    # Riga 1: Total Loss, Predictor Loss
+    # Riga 2: Actor, Refiner, Val Comparison
     # ==============================================================================
-    # Allarghiamo la figura a 3 colonne per fare spazio al Predictor
-    fig1, axes1 = plt.subplots(nrows=2, ncols=3, figsize=(18, 10))
-    axes1 = axes1.flatten()
+    fig1 = plt.figure(figsize=(18, 10))
+    
+    # Creiamo una griglia 2x6
+    gs = gridspec.GridSpec(2, 6, figure=fig1)
 
-    # 1. Total Loss
-    axes1[0].plot(df['Epoch'], df['loss_train'], label='Train', linewidth=2, color=c_train)
-    axes1[0].plot(df['Epoch'], df['loss_val'], label='Validation', linewidth=2, color=c_val)
-    axes1[0].set_title('Total Loss', fontweight='bold')
-    axes1[0].set_xlabel('Epoch')
-    axes1[0].set_ylabel('Loss')
-    axes1[0].grid(True, alpha=0.3)
-    axes1[0].legend()
+    # Assegniamo gli spazi: 
+    # Riga 1: 2 grafici da 3 colonne l'uno (centrati)
+    ax_total = fig1.add_subplot(gs[0, 0:3])
+    ax_pred = fig1.add_subplot(gs[0, 3:6])
+    
+    # Riga 2: 3 grafici da 2 colonne l'uno (distribuiti uniformemente)
+    ax_actor = fig1.add_subplot(gs[1, 0:2])
+    ax_ref = fig1.add_subplot(gs[1, 2:4])
+    ax_val_comp = fig1.add_subplot(gs[1, 4:6])
 
-    # 2. Actor Loss
-    axes1[1].plot(df['Epoch'], df['loss_actor_train'], label='Train', color=c_train)
-    axes1[1].plot(df['Epoch'], df['loss_actor_val'], label='Val', color=c_val)
-    axes1[1].set_title('Actor Loss', fontweight='bold')
-    axes1[1].set_xlabel('Epoch')
-    axes1[1].set_ylabel('Value')
-    axes1[1].grid(True, alpha=0.3)
-    axes1[1].legend()
+    # 1. Total Loss (Prima riga, sinistra)
+    ax_total.plot(df['Epoch'], df['loss_train'], label='Train', linewidth=2, color=c_train)
+    ax_total.plot(df['Epoch'], df['loss_val'], label='Validation', linewidth=2, color=c_val)
+    ax_total.set_title('Total Loss', fontweight='bold')
+    ax_total.set_xlabel('Epoch')
+    ax_total.set_ylabel('Loss')
+    ax_total.grid(True, alpha=0.3)
+    ax_total.legend()
 
-    # 3. Refiner Loss
-    axes1[2].plot(df['Epoch'], df['loss_refiner_train'], label='Train', color=c_train)
-    axes1[2].plot(df['Epoch'], df['loss_refiner_val'], label='Val', color=c_val)
-    axes1[2].set_title('Refiner Loss', fontweight='bold')
-    axes1[2].set_xlabel('Epoch')
-    axes1[2].set_ylabel('Value')
-    axes1[2].grid(True, alpha=0.3)
-    axes1[2].legend()
-
-    # 4. Predictor Loss (Solo se presente nel CSV)
+    # 2. Predictor Loss (Prima riga, destra)
     if 'loss_predictor_train' in df.columns and 'loss_predictor_val' in df.columns:
-        axes1[3].plot(df['Epoch'], df['loss_predictor_train'], label='Train', color=c_train)
-        axes1[3].plot(df['Epoch'], df['loss_predictor_val'], label='Val', color=c_val)
-        axes1[3].set_title('Predictor Loss', fontweight='bold')
-        axes1[3].set_xlabel('Epoch')
-        axes1[3].set_ylabel('Value')
-        axes1[3].grid(True, alpha=0.3)
-        axes1[3].legend()
+        ax_pred.plot(df['Epoch'], df['loss_predictor_train'], label='Train', color=c_train)
+        ax_pred.plot(df['Epoch'], df['loss_predictor_val'], label='Val', color=c_val)
+        ax_pred.set_title('Predictor Loss', fontweight='bold')
+        ax_pred.set_xlabel('Epoch')
+        ax_pred.set_ylabel('Value')
+        ax_pred.grid(True, alpha=0.3)
+        ax_pred.legend()
     else:
-        axes1[3].axis('off') # Nascondiamo il riquadro se le metriche non ci sono
+        ax_pred.axis('off') # Se non ci sono i dati, lascia lo spazio vuoto in modo pulito
 
-    # 5. Validation Loss Comparison (Actor vs Refiner)
-    axes1[4].plot(df['Epoch'], df['loss_actor_val'], label='Actor Val Loss', color=c_actor, linewidth=2.5)
-    axes1[4].plot(df['Epoch'], df['loss_refiner_val'], label='Refiner Val Loss', color=c_refiner, linewidth=2.5)
-    axes1[4].set_title('Validation Loss Comparison (Actor vs Refiner)', fontweight='bold')
-    axes1[4].set_xlabel('Epoch')
-    axes1[4].set_ylabel('Value')
-    axes1[4].grid(True, alpha=0.3)
-    axes1[4].legend()
+    # 3. Actor Loss (Seconda riga, sinistra)
+    ax_actor.plot(df['Epoch'], df['loss_actor_train'], label='Train', color=c_train)
+    ax_actor.plot(df['Epoch'], df['loss_actor_val'], label='Val', color=c_val)
+    ax_actor.set_title('Actor Loss', fontweight='bold')
+    ax_actor.set_xlabel('Epoch')
+    ax_actor.set_ylabel('Value')
+    ax_actor.grid(True, alpha=0.3)
+    ax_actor.legend()
 
-    # 6. Nascondiamo l'ultimo grafico vuoto (in basso a destra) per estetica
-    axes1[5].axis('off')
+    # 4. Refiner Loss (Seconda riga, centro)
+    ax_ref.plot(df['Epoch'], df['loss_refiner_train'], label='Train', color=c_train)
+    ax_ref.plot(df['Epoch'], df['loss_refiner_val'], label='Val', color=c_val)
+    ax_ref.set_title('Refiner Loss', fontweight='bold')
+    ax_ref.set_xlabel('Epoch')
+    ax_ref.set_ylabel('Value')
+    ax_ref.grid(True, alpha=0.3)
+    ax_ref.legend()
+
+    # 5. Validation Loss Comparison (Seconda riga, destra)
+    ax_val_comp.plot(df['Epoch'], df['loss_actor_val'], label='Actor Val', color=c_actor, linewidth=2.5)
+    ax_val_comp.plot(df['Epoch'], df['loss_refiner_val'], label='Refiner Val', color=c_refiner, linewidth=2.5)
+    ax_val_comp.set_title('Validation Loss Comparison', fontweight='bold')
+    ax_val_comp.set_xlabel('Epoch')
+    ax_val_comp.set_ylabel('Value')
+    ax_val_comp.grid(True, alpha=0.3)
+    ax_val_comp.legend()
 
     fig1.tight_layout()
     fig1.savefig(os.path.join(training_dir_path, 'plots_losses.png'), dpi=300)

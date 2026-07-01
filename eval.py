@@ -25,7 +25,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using the device: {device}")
 
-    policy_dir_path = './results/results_alcor_9/2026_06_27__18_08'
+    policy_dir_path = './results/results_alcor_10/2026_06_27__18_14'
 
 
     RENDER_CAMERA = "agentview" 
